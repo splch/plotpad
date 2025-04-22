@@ -36,8 +36,8 @@ class HomeScreen extends ConsumerWidget {
         onPressed: () async {
           final isar = ref.read(isarProvider);
           final sheet = Sheet(name: 'New Sheet');
-          // use the new async transaction API
-          await isar.writeAsync((isar) async {
+          // Use synchronous write so we don't spawn an isolate
+          isar.write((isar) {
             isar.sheets.put(sheet);
           });
         },

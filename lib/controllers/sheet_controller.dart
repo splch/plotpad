@@ -23,8 +23,8 @@ class SheetController {
 
   Future<void> updateCsv(Sheet sheet, String csv) async {
     sheet.csvContent = csv;
-    // use the new async transaction API
-    await isar.writeAsync((isar) async {
+    // Use synchronous write so we don't spawn an isolate
+    isar.write((isar) {
       isar.sheets.put(sheet);
     });
   }
