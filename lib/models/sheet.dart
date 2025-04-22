@@ -5,7 +5,7 @@ part 'sheet.g.dart';
 @Collection()
 class Sheet {
   @Id()
-  int id = 0; // 0 = auto‑increment
+  int id = 0; // auto‑increment
 
   String name;
   String csvContent;
