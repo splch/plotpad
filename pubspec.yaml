@@ -9,6 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  fl_chart: ^0.71.0
+  llama_cpp_dart: ^0.0.8
+  isar: ^4.0.0-dev.3
+  isar_flutter_libs: ^4.0.0-dev.3
+  flutter_secure_storage: ^4.2.1
+  encrypt: ^5.0.3
+  csv: ^6.0.0
+  flutter_riverpod: ^2.6.1
+  path_provider: ^2.1.5
+  build_runner: ^2.4.13
 
 dev_dependencies:
   flutter_test:
