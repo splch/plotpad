@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:logging/logging.dart';
+
 import '../models/sheet.dart';
 import '../providers.dart';
 import 'sheet_screen.dart';
+
+final _log = Logger('HomeScreen');
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    _log.fine('Building HomeScreen');
     final sheetsAsync = ref.watch(sheetListProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('PlotPad')),
       body: sheetsAsync.when(
@@ -18,28 +24,31 @@ class HomeScreen extends ConsumerWidget {
                 for (final s in sheets)
                   ListTile(
                     title: Text(s.name),
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SheetScreen(sheet: s),
-                          ),
+                    onTap: () {
+                      _log.info('Tapped sheet ${s.id}/${s.name}');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => SheetScreen(sheet: s),
                         ),
+                      );
+                    },
                   ),
               ],
             ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, _) {
+          _log.severe('Error loading sheets: $e');
+          return Center(child: Text('Error: $e'));
+        },
       ),
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
-        onPressed: () async {
+        onPressed: () {
+          _log.info('Creating new sheet');
           final isar = ref.read(isarProvider);
           final sheet = Sheet(name: 'New Sheet');
-          // Use synchronous write so we don't spawn an isolate
-          isar.write((isar) {
-            isar.sheets.put(sheet);
-          });
+          isar.write((isar) => isar.sheets.put(sheet));
         },
       ),
     );

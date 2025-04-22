@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:logging/logging.dart';
+
 import '../controllers/sheet_controller.dart';
+
+final _log = Logger('ChartCarousel');
 
 class ChartCarousel extends StatelessWidget {
   final List<ChartSpec> specs;
@@ -8,13 +12,13 @@ class ChartCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    _log.info('Rendering ChartCarousel with ${specs.length} specs');
     if (specs.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Charts')),
         body: const Center(child: Text('No numeric columns found.')),
       );
     }
-
     return Scaffold(
       appBar: AppBar(title: const Text('Charts')),
       body: PageView.builder(
