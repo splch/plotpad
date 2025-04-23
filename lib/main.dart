@@ -224,7 +224,7 @@ class Ctrl {
     final rows = const CsvToListConverter(
       eol: '\n',
     ).convert(s.csv.replaceAll(r'\n', '\n'));
-    if (rows.length < 3) {
+    if (rows.length < 2) {
       _log('Not enough rows for charting', lvl: 500);
       return [];
     }
@@ -233,12 +233,12 @@ class Ctrl {
 
     // 2. prompt Llama
     final llama = await _llama();
-    llama.stop(); // reset KV-cache
     final prompt = _buildPrompt(header, types);
     _log('Prompting Llama (${prompt.length} chars)');
     final resp = await llama
         .prompt([UserLlamaMessage(prompt)])
         .fold<String>('', (a, b) => a + b);
+    llama.stop(); // reset KV-cache
     _log('LLM response chars=${resp.length}');
 
     // 3. extract JSON
