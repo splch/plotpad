@@ -1,14 +1,3 @@
-// File: plotpad.dart
-//
-// A leaner, faster PlotPad.
-//
-// * removed unused imports and redundant code
-// * shared helpers for logging, math & parsing
-// * stream-lined chart factories
-// * factored aggregation logic (bar/pie)
-// * minor UI clean-ups & null-safety tweaks
-// * same public API - drop-in replacement
-
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:io';
