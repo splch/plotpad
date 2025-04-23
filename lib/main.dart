@@ -78,19 +78,23 @@ class SheetController {
   }
 
   Future<void> setPassword(Sheet sheet, {required String password}) async {
+    // do nothing if sheet content is empty
+    if (sheet.csvContent.trim().isEmpty) return;
+
     final salt = Uint8List.fromList(
       List<int>.generate(16, (_) => Random().nextInt(256)),
     );
     final keyStr = await _deriveKey(password, salt);
     final encrypter = await _buildEncrypter(keyStr);
-    final iv = enc.IV.fromLength(16);
+    final iv = enc.IV.fromLength(16); // 16-byte IV
+
     final cipher = encrypter.encrypt(sheet.csvContent, iv: iv);
 
     final keyName =
         'sheet-${sheet.id}-${DateTime.now().millisecondsSinceEpoch}';
     await _storage.write(key: keyName, value: keyStr);
 
-    await _isar.writeAsync((isar) {
+    await _isar.write((isar) {
       sheet
         ..isEncrypted = true
         ..csvContent = cipher.base64
@@ -105,6 +109,7 @@ class SheetController {
     }
     final keyStr = await _storage.read(key: sheet.passwordKeyName!);
     if (keyStr == null) return null;
+
     final encrypter = await _buildEncrypter(keyStr);
     final iv = enc.IV.fromLength(16);
     try {
@@ -121,7 +126,7 @@ class SheetController {
   }
 
   Future<void> updateCsv(Sheet sheet, String csv) async {
-    await _isar.writeAsync((isar) {
+    await _isar.write((isar) {
       sheet.csvContent = csv;
       isar.sheets.put(sheet);
     });
@@ -178,13 +183,9 @@ $sample
 
     final tokens = llama.prompt([UserLlamaMessage(prompt)]);
     final buf = StringBuffer();
-    await for (var t in tokens) {
-      buf.write(t);
-    }
+    await for (var t in tokens) buf.write(t);
     final raw = buf.toString();
-    debugPrint('Model response: $raw');
 
-    /* ---- extract JSON ---- */
     final codeBlock = RegExp(r'```(?:json)?\s*([\s\S]*?)\s*```', dotAll: true);
     String? jsonPart;
     if (codeBlock.hasMatch(raw)) {
@@ -205,14 +206,12 @@ $sample
       return [];
     }
 
-    /* ---- normalize to List<Map<String,dynamic>> ---- */
     List<Map<String, dynamic>> entries;
     if (decoded.isNotEmpty && decoded.first is Map) {
       entries = decoded.cast<Map<String, dynamic>>();
     } else if (decoded.isNotEmpty &&
         decoded.first is String &&
         decoded.length % 3 == 0) {
-      // flat triplets -> objects
       entries = [
         for (var i = 0; i < decoded.length; i += 3)
           {'type': decoded[i], 'x': decoded[i + 1], 'y': decoded[i + 2]},
@@ -221,7 +220,6 @@ $sample
       return [];
     }
 
-    /* ---- build ChartSpecs ---- */
     final specs = <ChartSpec>[];
     for (final m in entries) {
       switch (m['type']) {
@@ -456,7 +454,7 @@ class HomeScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final isar = ref.read(isarProvider);
-          await isar.writeAsync((isar) {
+          await isar.write((isar) {
             final sheet = Sheet(name: 'Untitled Sheet')
               ..id = isar.sheets.autoIncrement();
             isar.sheets.put(sheet);
@@ -604,7 +602,7 @@ class _SheetScreenState extends ConsumerState<SheetScreen> {
                 Chip(
                   label: Text(tag),
                   onDeleted: () async {
-                    await ref.read(isarProvider).writeAsync((isar) {
+                    await ref.read(isarProvider).write((isar) {
                       sheet.tags.remove(tag);
                       isar.sheets.put(sheet);
                     });
@@ -634,9 +632,7 @@ class _SheetScreenState extends ConsumerState<SheetScreen> {
                               onPressed: () async {
                                 final tag = _tagCtrl.text.trim();
                                 if (tag.isNotEmpty) {
-                                  await ref.read(isarProvider).writeAsync((
-                                    isar,
-                                  ) {
+                                  await ref.read(isarProvider).write((isar) {
                                     sheet.tags.add(tag);
                                     isar.sheets.put(sheet);
                                   });
