@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:isar/isar.dart';
 import 'package:llama_sdk/llama_sdk.dart'
     if (dart.library.html) 'package:llama_sdk/llama_sdk.web.dart';
@@ -20,21 +21,20 @@ import 'package:path_provider/path_provider.dart';
 
 import 'models/sheet.dart';
 
-/// Wrapper around `developer.log` so we can tweak from one place.
+/// Convenience wrapper around `developer.log`.
 void _log(
   String msg, {
   Object? error,
   StackTrace? st,
   int lvl = 0, // 0-info, 500-warning, 1000-error
-}) =>
-    dev.log(
-      msg,
-      name: 'PlotPad',
-      level: lvl,
-      error: error,
-      stackTrace: st,
-      time: DateTime.now(),
-    );
+}) => dev.log(
+  msg,
+  name: 'PlotPad',
+  level: lvl,
+  error: error,
+  stackTrace: st,
+  time: DateTime.now(),
+);
 
 /* ───── Riverpod providers ───── */
 
@@ -129,7 +129,7 @@ class ChartSpec {
   }
 }
 
-/* ───── Controller (Persistence, Crypto, LLM) ───── */
+/* ───── Controller (persistence, crypto, LLM) ───── */
 
 class Ctrl {
   Ctrl(this.db) : storage = const FlutterSecureStorage() {
@@ -139,17 +139,18 @@ class Ctrl {
   final Isar db;
   final FlutterSecureStorage storage;
 
-/* ---------- cryptography ---------- */
+  /* ---------- cryptography ---------- */
 
   static const _rounds = 10000;
   Future<Uint8List> _key(String pwd, List<int> salt) async {
     _log('Deriving PBKDF2 key');
     return Uint8List.fromList(
       await crypto.Pbkdf2(
-        macAlgorithm: crypto.Hmac.sha256(),
-        iterations: _rounds,
-        bits: 256,
-      ).deriveKey(secretKey: crypto.SecretKey(utf8.encode(pwd)), nonce: salt)
+            macAlgorithm: crypto.Hmac.sha256(),
+            iterations: _rounds,
+            bits: 256,
+          )
+          .deriveKey(secretKey: crypto.SecretKey(utf8.encode(pwd)), nonce: salt)
           .then((k) => k.extractBytes()),
     );
   }
@@ -157,10 +158,10 @@ class Ctrl {
   enc.Encrypter _aes(Uint8List k) =>
       enc.Encrypter(enc.AES(enc.Key(k), mode: enc.AESMode.cbc));
 
-/* ---------- lock / unlock ---------- */
+  /* ---------- lock / unlock ---------- */
 
   Future<void> lock(Sheet s, String pwd) async {
-    if (s.csv.trim().isEmpty) return;
+    if (s.enc || s.csv.trim().isEmpty) return;
     _log('Locking sheet id=${s.id}');
     final salt = Uint8List.fromList(
       List<int>.generate(16, (_) => Random.secure().nextInt(256)),
@@ -211,13 +212,14 @@ class Ctrl {
     db.write((i) => i.sheets.put(s..csv = csv));
   }
 
-/* ---------- LLM-driven chart generation ---------- */
+  /* ---------- LLM-driven chart generation ---------- */
 
   Future<List<ChartSpec>> charts(Sheet s) async {
     _log('charts() start for id=${s.id}');
     // 1. parse CSV
-    final rows = const CsvToListConverter(eol: '\n')
-        .convert(s.csv.replaceAll(r'\n', '\n'));
+    final rows = const CsvToListConverter(
+      eol: '\n',
+    ).convert(s.csv.replaceAll(r'\n', '\n'));
     if (rows.length < 2) {
       _log('Not enough rows for charting', lvl: 500);
       return [];
@@ -295,7 +297,7 @@ class Ctrl {
     return specs;
   }
 
-/* ---------- helpers ---------- */
+  /* ---------- helpers ---------- */
 
   String _buildPrompt(List<String> header, List<String> types) => '''
 You are an expert data-visualisation assistant.
@@ -307,7 +309,8 @@ ${[for (var i = 0; i < header.length; i++) '- ${header[i]} (${types[i]})'].join(
 
 Schema:
 {"type":"scatter|line|bar|histogram|pie|radar",
- "x":"col","y":"col|NULL","cols":[col], "agg":"sum|avg|count|NULL","title":"string"}
+ "x":"col","y":"col|NULL","cols":[col],
+ "agg":"sum|avg|count|NULL","title":"string"}
 
 Example:
 [{"type":"histogram","x":"Height","title":"Height distribution"},
@@ -330,7 +333,7 @@ Example:
     return a >= 0 && b > a ? s.substring(a, b + 1) : null;
   }
 
-/* scatter / line */
+  /* scatter / line */
   List<FlSpot> _scatter(List<List> r, String x, String y) {
     final h = r.first.cast<String>();
     final xi = h.indexOf(x), yi = h.indexOf(y);
@@ -346,7 +349,7 @@ Example:
   List<FlSpot> _line(List<List> r, String x, String y) =>
       _scatter(r, x, y)..sort((a, b) => a.x.compareTo(b.x));
 
-/* bars */
+  /* bars */
   List<BarChartRodData> _bars(List<List> r, String x, String? y, String? agg) {
     final h = r.first.cast<String>();
     final xi = h.indexOf(x);
@@ -368,26 +371,28 @@ Example:
         BarChartRodData(
           toY: switch (agg) {
             'sum' => bucket[k]!.fold(0.0, (a, b) => a + b),
-            'avg' => bucket[k]!.isEmpty
-                ? 0
-                : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
+            'avg' =>
+              bucket[k]!.isEmpty
+                  ? 0
+                  : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
             _ => bucket[k]!.isEmpty ? 1 : bucket[k]!.length.toDouble(),
           },
         ),
     ];
   }
 
-/* histogram */
+  /* histogram */
   List<FlSpot> _hist(List<List> r, String c) {
     final idx = r.first.cast<String>().indexOf(c);
     if (idx < 0) return [];
-    final nums = r
-        .skip(1)
-        .map((e) => num.tryParse('${e[idx]}'))
-        .whereType<num>()
-        .map((e) => e.toDouble())
-        .toList()
-      ..sort();
+    final nums =
+        r
+            .skip(1)
+            .map((e) => num.tryParse('${e[idx]}'))
+            .whereType<num>()
+            .map((e) => e.toDouble())
+            .toList()
+          ..sort();
     if (nums.isEmpty) return [];
     final bins = max(5, sqrt(nums.length).round());
     final minV = nums.first, step = (nums.last - minV) / bins;
@@ -401,7 +406,7 @@ Example:
     ];
   }
 
-/* pie */
+  /* pie */
   List<PieChartSectionData> _pie(
     List<List> r,
     String x,
@@ -426,9 +431,10 @@ Example:
           title: k,
           value: switch (agg) {
             'sum' => bucket[k]!.fold(0.0, (a, b) => a! + b),
-            'avg' => bucket[k]!.isEmpty
-                ? 0
-                : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
+            'avg' =>
+              bucket[k]!.isEmpty
+                  ? 0
+                  : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
             _ => bucket[k]!.isEmpty ? 1 : bucket[k]!.length.toDouble(),
           },
           radius: 50,
@@ -436,7 +442,7 @@ Example:
     ];
   }
 
-/* radar */
+  /* radar */
   _RadarRes? _radar(List<List> r, List<String> cols) {
     if (cols.length < 3 || cols.length > 6) return null;
     final h = r.first.cast<String>();
@@ -458,7 +464,7 @@ Example:
     return _RadarRes(entries, cols);
   }
 
-/* llama loader */
+  /* llama loader */
   Llama? _ll;
   Future<Llama> _llama() async {
     if (_ll != null) return _ll!;
@@ -520,6 +526,8 @@ class _App extends ConsumerWidget {
   }
 }
 
+/* ───── Home list with Slidable actions ───── */
+
 class _Home extends ConsumerWidget {
   const _Home();
   @override
@@ -532,20 +540,21 @@ class _Home extends ConsumerWidget {
       final tc = TextEditingController(text: s.name);
       final newName = await showDialog<String>(
         context: ctx,
-        builder: (_) => AlertDialog(
-          title: const Text('Rename sheet'),
-          content: TextField(controller: tc, autofocus: true),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+        builder:
+            (_) => AlertDialog(
+              title: const Text('Rename sheet'),
+              content: TextField(controller: tc, autofocus: true),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, tc.text.trim()),
+                  child: const Text('Save'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, tc.text.trim()),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
       );
       if (newName != null && newName.isNotEmpty && newName != s.name) {
         _log('Rename sheet id=${s.id} to "$newName"');
@@ -556,22 +565,24 @@ class _Home extends ConsumerWidget {
     Future<void> _deleteSheet(Sheet s) async {
       final ok = await showDialog<bool>(
         context: ctx,
-        builder: (_) => AlertDialog(
-          title: const Text('Delete sheet?'),
-          content: Text('This will permanently delete "${s.name}".'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
+        builder:
+            (_) => AlertDialog(
+              title: const Text('Delete sheet?'),
+              content: Text('This will permanently delete "${s.name}".'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(ctx).colorScheme.error,
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Delete'),
+                ),
+              ],
             ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete'),
-            ),
-          ],
-        ),
       );
       if (ok == true) {
         _log('Delete sheet id=${s.id}');
@@ -580,6 +591,34 @@ class _Home extends ConsumerWidget {
         }
         ref.read(dbP).write((i) => i.sheets.delete(s.id));
       }
+    }
+
+    Future<void> _encryptSheet(Sheet s) async {
+      final pwd = await showDialog<String>(
+        context: ctx,
+        builder: (_) {
+          final t = TextEditingController();
+          return AlertDialog(
+            title: const Text('Set password'),
+            content: TextField(
+              controller: t,
+              obscureText: true,
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, t.text),
+                child: const Text('Encrypt'),
+              ),
+            ],
+          );
+        },
+      );
+      if (pwd != null && pwd.isNotEmpty) await ctrl.lock(s, pwd);
     }
 
     return Scaffold(
@@ -600,44 +639,60 @@ class _Home extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: list.isEmpty
-                ? const Center(child: Text('No sheets yet'))
-                : ListView.builder(
-                    itemCount: list.length,
-                    itemBuilder: (_, i) => ListTile(
-                      title: Text(list[i].name),
-                      subtitle: Wrap(
-                        spacing: 4,
-                        children: [
-                          for (var t in list[i].tags) Chip(label: Text(t)),
-                        ],
-                      ),
-                      onTap: () {
-                        _log('Open sheet id=${list[i].id}');
-                        Navigator.push(
-                          ctx,
-                          MaterialPageRoute(
-                            builder: (_) => _Sheet(list[i]),
+            child:
+                list.isEmpty
+                    ? const Center(child: Text('No sheets yet'))
+                    : ListView.builder(
+                      itemCount: list.length,
+                      itemBuilder: (_, i) {
+                        final s = list[i];
+                        return Slidable(
+                          key: ValueKey(s.id),
+                          endActionPane: ActionPane(
+                            motion: const DrawerMotion(),
+                            extentRatio: s.enc ? 0.50 : 0.75,
+                            children: [
+                              SlidableAction(
+                                icon: Icons.edit,
+                                label: 'Rename',
+                                onPressed: (_) => _renameSheet(s),
+                              ),
+                              if (!s.enc)
+                                SlidableAction(
+                                  icon: Icons.lock,
+                                  label: 'Encrypt',
+                                  onPressed: (_) => _encryptSheet(s),
+                                ),
+                              SlidableAction(
+                                backgroundColor:
+                                    Theme.of(ctx).colorScheme.errorContainer,
+                                foregroundColor:
+                                    Theme.of(ctx).colorScheme.onErrorContainer,
+                                icon: Icons.delete,
+                                label: 'Delete',
+                                onPressed: (_) => _deleteSheet(s),
+                              ),
+                            ],
+                          ),
+                          child: ListTile(
+                            title: Text(s.name),
+                            subtitle: Wrap(
+                              spacing: 4,
+                              children: [
+                                for (var t in s.tags) Chip(label: Text(t)),
+                              ],
+                            ),
+                            onTap: () {
+                              _log('Open sheet id=${s.id}');
+                              Navigator.push(
+                                ctx,
+                                MaterialPageRoute(builder: (_) => _Sheet(s)),
+                              );
+                            },
                           ),
                         );
                       },
-                      trailing: Wrap(
-                        spacing: 4,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit),
-                            tooltip: 'Rename',
-                            onPressed: () => _renameSheet(list[i]),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete),
-                            tooltip: 'Delete',
-                            onPressed: () => _deleteSheet(list[i]),
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
           ),
         ],
       ),
@@ -654,6 +709,8 @@ class _Home extends ConsumerWidget {
     );
   }
 }
+
+/* ───── Sheet page ───── */
 
 class _Sheet extends ConsumerStatefulWidget {
   const _Sheet(this.sheet);
@@ -701,13 +758,14 @@ class _SheetState extends ConsumerState<_Sheet> {
       set
           ? await c.lock(widget.sheet, pwd)
           : await c.unlock(widget.sheet, pwd).then((raw) {
-              if (raw == null) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Wrong password')));
-              } else {
-                setState(() => _csvCtl.text = raw);
-              }
-            });
+            if (raw == null) {
+              ScaffoldMessenger.of(
+                ctx,
+              ).showSnackBar(const SnackBar(content: Text('Wrong password')));
+            } else {
+              setState(() => _csvCtl.text = raw);
+            }
+          });
       setState(() {});
     }
 
@@ -741,7 +799,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                 Chip(
                   label: Text(t),
                   onDeleted: () {
-                    _log('Remove tag "$t" from id=${widget.sheet.id}');
+                    _log('Remove tag "$t"');
                     ref.read(dbP).write((i) => widget.sheet.tags.remove(t));
                     setState(() {});
                   },
@@ -751,23 +809,24 @@ class _SheetState extends ConsumerState<_Sheet> {
                 onPressed: () async {
                   final tag = await showDialog<String>(
                     context: ctx,
-                    builder: (_) => AlertDialog(
-                      content: TextField(controller: _tagCtl),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancel'),
+                    builder:
+                        (_) => AlertDialog(
+                          content: TextField(controller: _tagCtl),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              onPressed:
+                                  () => Navigator.pop(ctx, _tagCtl.text.trim()),
+                              child: const Text('Add'),
+                            ),
+                          ],
                         ),
-                        ElevatedButton(
-                          onPressed: () =>
-                              Navigator.pop(ctx, _tagCtl.text.trim()),
-                          child: const Text('Add'),
-                        ),
-                      ],
-                    ),
                   );
                   if (tag != null && tag.isNotEmpty) {
-                    _log('Add tag "$tag" to id=${widget.sheet.id}');
+                    _log('Add tag "$tag"');
                     ref.read(dbP).write((i) => widget.sheet.tags.add(tag));
                     _tagCtl.clear();
                     setState(() {});
@@ -781,7 +840,7 @@ class _SheetState extends ConsumerState<_Sheet> {
             icon: const Icon(Icons.insights),
             label: const Text('Generate charts'),
             onPressed: () async {
-              _log('Generate charts for id=${widget.sheet.id}');
+              _log('Generate charts');
               final specs = await c.charts(widget.sheet);
               if (!mounted) return;
               Navigator.push(
@@ -796,29 +855,34 @@ class _SheetState extends ConsumerState<_Sheet> {
   }
 }
 
+/* ───── Charts page ───── */
+
 class _Charts extends StatelessWidget {
   const _Charts(this.specs);
   final List<ChartSpec> specs;
+
   @override
   Widget build(ctx) => Scaffold(
-        appBar: AppBar(title: const Text('Charts')),
-        body: specs.isEmpty
+    appBar: AppBar(title: const Text('Charts')),
+    body:
+        specs.isEmpty
             ? const Center(child: Text('No numeric data'))
             : PageView.builder(
-                itemCount: specs.length,
-                itemBuilder: (_, i) => Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Text(
-                        specs[i].title,
-                        style: Theme.of(ctx).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(child: specs[i].view),
-                    ],
+              itemCount: specs.length,
+              itemBuilder:
+                  (_, i) => Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Text(
+                          specs[i].title,
+                          style: Theme.of(ctx).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(child: specs[i].view),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-      );
+            ),
+  );
 }
