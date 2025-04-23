@@ -58,7 +58,7 @@ class SheetController {
 
   static const _pbkdfRounds = 10000;
 
-  Future<String> _deriveKey(String password, List<int> salt) async {
+  Future<Uint8List> _deriveKey(String password, List<int> salt) async {
     final pbkdf2 = crypto.Pbkdf2(
       macAlgorithm: crypto.Hmac.sha256(),
       iterations: _pbkdfRounds,
@@ -68,36 +68,42 @@ class SheetController {
       secretKey: crypto.SecretKey(utf8.encode(password)),
       nonce: salt,
     );
-    final raw = await secretKey.extractBytes();
-    return base64Encode(raw);
+    return Uint8List.fromList(await secretKey.extractBytes());
   }
 
-  Future<enc.Encrypter> _buildEncrypter(String base64Key) async {
-    final key = enc.Key(base64Decode(base64Key));
-    return enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc));
-  }
+  enc.Encrypter _encrypter(Uint8List keyBytes) =>
+      enc.Encrypter(enc.AES(enc.Key(keyBytes), mode: enc.AESMode.cbc));
 
   Future<void> setPassword(Sheet sheet, {required String password}) async {
-    // do nothing if sheet content is empty
     if (sheet.csvContent.trim().isEmpty) return;
 
+    // 1. derive key with random salt
     final salt = Uint8List.fromList(
-      List<int>.generate(16, (_) => Random().nextInt(256)),
+      List<int>.generate(16, (_) => Random.secure().nextInt(256)),
     );
-    final keyStr = await _deriveKey(password, salt);
-    final encrypter = await _buildEncrypter(keyStr);
-    final iv = enc.IV.fromLength(16); // 16-byte IV
+    final keyBytes = await _deriveKey(password, salt);
 
-    final cipher = encrypter.encrypt(sheet.csvContent, iv: iv);
+    // 2. random IV
+    final iv = enc.IV.fromSecureRandom(16);
 
+    // 3. encrypt
+    final cipher =
+        _encrypter(keyBytes).encrypt(sheet.csvContent, iv: iv).base64;
+
+    // 4. store salt & iv (no key) in secure storage
+    final payload = jsonEncode({
+      'salt': base64Encode(salt),
+      'iv': base64Encode(iv.bytes),
+    });
     final keyName =
         'sheet-${sheet.id}-${DateTime.now().millisecondsSinceEpoch}';
-    await _storage.write(key: keyName, value: keyStr);
+    await _storage.write(key: keyName, value: payload);
 
+    // 5. persist
     await _isar.write((isar) {
       sheet
         ..isEncrypted = true
-        ..csvContent = cipher.base64
+        ..csvContent = cipher
         ..passwordKeyName = keyName;
       isar.sheets.put(sheet);
     });
@@ -107,25 +113,26 @@ class SheetController {
     if (!sheet.isEncrypted || sheet.passwordKeyName == null) {
       return sheet.csvContent;
     }
-    final keyStr = await _storage.read(key: sheet.passwordKeyName!);
-    if (keyStr == null) return null;
 
-    final encrypter = await _buildEncrypter(keyStr);
-    final iv = enc.IV.fromLength(16);
+    final payloadStr = await _storage.read(key: sheet.passwordKeyName!);
+    if (payloadStr == null) return null;
+    final payload = jsonDecode(payloadStr) as Map<String, dynamic>;
+    final salt = base64Decode(payload['salt'] as String);
+    final iv = enc.IV(base64Decode(payload['iv'] as String));
+
+    final keyBytes = await _deriveKey(password, salt);
     try {
-      final plain = encrypter.decrypt(
-        enc.Encrypted.fromBase64(sheet.csvContent),
-        iv: iv,
-      );
-      final derived = await _deriveKey(password, List<int>.filled(16, 0));
-      if (derived != keyStr) return null;
-      return plain;
-    } catch (_) {
+      return _encrypter(
+        keyBytes,
+      ).decrypt(enc.Encrypted.fromBase64(sheet.csvContent), iv: iv);
+    } on ArgumentError {
+      // wrong key (bad password) or corrupted ciphertext
       return null;
     }
   }
 
   Future<void> updateCsv(Sheet sheet, String csv) async {
+    if (sheet.isEncrypted) return; // disabled while encrypted
     await _isar.write((isar) {
       sheet.csvContent = csv;
       isar.sheets.put(sheet);
