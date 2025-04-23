@@ -21,19 +21,19 @@ import 'package:path_provider/path_provider.dart';
 
 import 'models/sheet.dart';
 
-/// Convenience wrapper around `developer.log`.
+/* ───── logging helper ───── */
 void _log(
   String msg, {
-  Object? error,
+  int lvl = 0,
+  Object? err,
   StackTrace? st,
-  int lvl = 0, // 0-info, 500-warning, 1000-error
+  String tag = '',
 }) => dev.log(
-  msg,
+  '[${tag.isEmpty ? 'PlotPad' : tag}] $msg',
   name: 'PlotPad',
   level: lvl,
-  error: error,
+  error: err,
   stackTrace: st,
-  time: DateTime.now(),
 );
 
 /* ───── Riverpod providers ───── */
@@ -66,9 +66,9 @@ class ChartSpec {
   const ChartSpec._(this.title, this.view);
 
   factory ChartSpec.scatter(String t, List<FlSpot> pts) {
-    _log('Created scatter "$t" with ${pts.length} pts');
+    final title = t.isEmpty ? 'Scatter' : t;
     return ChartSpec._(
-      t,
+      title,
       ScatterChart(
         ScatterChartData(
           scatterSpots: [for (final p in pts) ScatterSpot(p.x, p.y)],
@@ -78,17 +78,17 @@ class ChartSpec {
   }
 
   factory ChartSpec.line(String t, List<FlSpot> pts) {
-    _log('Created line "$t" with ${pts.length} pts');
+    final title = t.isEmpty ? 'Line' : t;
     return ChartSpec._(
-      t,
+      title,
       LineChart(LineChartData(lineBarsData: [LineChartBarData(spots: pts)])),
     );
   }
 
   factory ChartSpec.bar(String t, List<BarChartRodData> rods) {
-    _log('Created bar "$t" with ${rods.length} bars');
+    final title = t.isEmpty ? 'Bar' : t;
     return ChartSpec._(
-      t,
+      title,
       BarChart(
         BarChartData(
           barGroups: [
@@ -100,13 +100,15 @@ class ChartSpec {
     );
   }
 
-  factory ChartSpec.histogram(String t, List<FlSpot> pts) =>
-      ChartSpec.line(t, pts);
+  factory ChartSpec.histogram(String t, List<FlSpot> pts) {
+    final title = t.isEmpty ? 'Histogram' : t;
+    return ChartSpec.line(title, pts);
+  }
 
   factory ChartSpec.pie(String t, List<PieChartSectionData> slices) {
-    _log('Created pie "$t" with ${slices.length} slices');
+    final title = t.isEmpty ? 'Pie' : t;
     return ChartSpec._(
-      t,
+      title,
       PieChart(PieChartData(sections: slices, sectionsSpace: 2)),
     );
   }
@@ -116,9 +118,9 @@ class ChartSpec {
     List<RadarEntry> entries,
     List<String> labels,
   ) {
-    _log('Created radar "$t" (${labels.length} axes)');
+    final title = t.isEmpty ? 'Radar' : t;
     return ChartSpec._(
-      t,
+      title,
       RadarChart(
         RadarChartData(
           dataSets: [RadarDataSet(dataEntries: entries)],
@@ -129,40 +131,36 @@ class ChartSpec {
   }
 }
 
-/* ───── Controller (persistence, crypto, LLM) ───── */
+/* ───── Controller ───── */
 
 class Ctrl {
-  Ctrl(this.db) : storage = const FlutterSecureStorage() {
-    _log('Ctrl instantiated');
-  }
-
+  Ctrl(this.db) : storage = const FlutterSecureStorage();
   final Isar db;
   final FlutterSecureStorage storage;
 
-  /* ---------- cryptography ---------- */
+  /* ---------- crypto ---------- */
 
   static const _rounds = 10000;
-  Future<Uint8List> _key(String pwd, List<int> salt) async {
-    _log('Deriving PBKDF2 key');
-    return Uint8List.fromList(
-      await crypto.Pbkdf2(
-            macAlgorithm: crypto.Hmac.sha256(),
-            iterations: _rounds,
-            bits: 256,
-          )
-          .deriveKey(secretKey: crypto.SecretKey(utf8.encode(pwd)), nonce: salt)
-          .then((k) => k.extractBytes()),
-    );
-  }
+  Future<Uint8List> _key(String pwd, List<int> salt) async =>
+      Uint8List.fromList(
+        await crypto.Pbkdf2(
+              macAlgorithm: crypto.Hmac.sha256(),
+              iterations: _rounds,
+              bits: 256,
+            )
+            .deriveKey(
+              secretKey: crypto.SecretKey(utf8.encode(pwd)),
+              nonce: salt,
+            )
+            .then((k) => k.extractBytes()),
+      );
 
   enc.Encrypter _aes(Uint8List k) =>
       enc.Encrypter(enc.AES(enc.Key(k), mode: enc.AESMode.cbc));
 
-  /* ---------- lock / unlock ---------- */
-
   Future<void> lock(Sheet s, String pwd) async {
     if (s.enc || s.csv.trim().isEmpty) return;
-    _log('Locking sheet id=${s.id}');
+    _log('Locking id=${s.id}', tag: 'crypto');
     final salt = Uint8List.fromList(
       List<int>.generate(16, (_) => Random.secure().nextInt(256)),
     );
@@ -181,15 +179,14 @@ class Ctrl {
           ..secretId = id,
       ),
     );
-    _log('Sheet ${s.id} locked');
   }
 
   Future<String?> unlock(Sheet s, String pwd) async {
     if (!s.enc) return s.csv;
-    _log('Unlocking sheet id=${s.id}');
+    _log('Unlock attempt id=${s.id}', tag: 'crypto');
     final meta = await storage.read(key: s.secretId!);
     if (meta == null) {
-      _log('Secure-store meta missing for ${s.secretId}', lvl: 900);
+      _log('meta missing', tag: 'crypto', lvl: 800);
       return null;
     }
     final j = jsonDecode(meta);
@@ -199,113 +196,120 @@ class Ctrl {
         enc.Encrypted.fromBase64(s.csv),
         iv: enc.IV(base64Decode(j['iv'])),
       );
-      _log('Unlock OK for id=${s.id}');
+      _log('Unlock OK', tag: 'crypto');
       return plain;
     } on ArgumentError catch (e, st) {
-      _log('Unlock FAILED id=${s.id}', error: e, st: st, lvl: 1000);
+      _log('Unlock failed', tag: 'crypto', err: e, st: st, lvl: 1000);
       return null;
     }
   }
 
+  /* ---------- CSV persistence ---------- */
+
   void setCsv(Sheet s, String csv) {
-    _log('Updating CSV for id=${s.id} (len=${csv.length})');
+    _log('DB write len=${csv.length} id=${s.id}', tag: 'db');
     db.write((i) => i.sheets.put(s..csv = csv));
   }
 
-  /* ---------- LLM-driven chart generation ---------- */
+  /* ---------- chart helpers ---------- */
 
-  Future<List<ChartSpec>> charts(Sheet s) async {
-    _log('charts() start for id=${s.id}');
-    // 1. parse CSV
+  Future<List<ChartSpec>> charts(Sheet s) => _chartsOnCsv(s.csv);
+  Future<List<ChartSpec>> chartsOnCsv(String csv) => _chartsOnCsv(csv);
+
+  Future<List<ChartSpec>> _chartsOnCsv(String csv) async {
+    _log('CSV length=${csv.length}', tag: 'charts');
     final rows = const CsvToListConverter(
       eol: '\n',
-    ).convert(s.csv.replaceAll(r'\n', '\n'));
-    if (rows.length < 2) {
-      _log('Not enough rows for charting', lvl: 500);
-      return [];
-    }
+    ).convert(csv.replaceAll(r'\n', '\n'));
+    _log('Rows parsed=${rows.length}', tag: 'charts');
+    if (rows.length < 2) return [];
+
     final header = rows.first.cast<String>();
     final types = _profile(rows);
+    _log('Header=$header', tag: 'charts');
+    _log('Types =$types', tag: 'charts');
 
-    // 2. prompt Llama
     final llama = await _llama();
     final prompt = _buildPrompt(header, types);
-    _log('Prompting Llama (${prompt.length} chars)');
+    _log('Prompt chars=${prompt.length}', tag: 'charts');
     final resp = await llama
         .prompt([UserLlamaMessage(prompt)])
         .fold<String>('', (a, b) => a + b);
-    llama.reload(); // reset KV-cache
-    _log('LLM response chars=${resp.length}');
+    llama.reload();
+    _log(
+      'LLM raw (first 500)=${resp.substring(0, min(500, resp.length))}',
+      tag: 'charts',
+    );
 
-    // 3. extract JSON
     final jsonTxt = _extractJson(resp);
-    if (jsonTxt == null) {
-      _log('No JSON found from LLM', lvl: 900);
-      return [];
-    }
-    _log('LLM JSON: $jsonTxt');
+    _log('JSON slice=${jsonTxt ?? 'null'}', tag: 'charts');
+    if (jsonTxt == null) return _fallbackCharts(rows, header);
 
-    // 4. build chart specs
     final specs = <ChartSpec>[];
     for (final m in jsonDecode(jsonTxt) as List) {
       try {
         switch (m['type']) {
           case 'scatter':
             final d = _scatter(rows, m['x'], m['y']);
-            if (d.isNotEmpty) {
-              specs.add(
-                ChartSpec.scatter(m['title'] ?? '${m['y']} vs ${m['x']}', d),
-              );
-            }
+            if (d.isNotEmpty) specs.add(ChartSpec.scatter(m['title'] ?? '', d));
             break;
           case 'line':
             final d = _line(rows, m['x'], m['y']);
-            if (d.isNotEmpty) {
-              specs.add(
-                ChartSpec.line(m['title'] ?? '${m['y']} over ${m['x']}', d),
-              );
-            }
+            if (d.isNotEmpty) specs.add(ChartSpec.line(m['title'] ?? '', d));
             break;
           case 'bar':
             final d = _bars(rows, m['x'], m['y'], m['agg']);
-            if (d.isNotEmpty) specs.add(ChartSpec.bar(m['title'] ?? m['x'], d));
+            if (d.isNotEmpty) specs.add(ChartSpec.bar(m['title'] ?? '', d));
             break;
           case 'histogram':
             final d = _hist(rows, m['x']);
-            if (d.isNotEmpty) {
-              specs.add(ChartSpec.histogram(m['title'] ?? m['x'], d));
-            }
+            if (d.isNotEmpty)
+              specs.add(ChartSpec.histogram(m['title'] ?? '', d));
             break;
           case 'pie':
             final d = _pie(rows, m['x'], m['y'], m['agg']);
-            if (d.isNotEmpty) specs.add(ChartSpec.pie(m['title'] ?? m['x'], d));
+            if (d.isNotEmpty) specs.add(ChartSpec.pie(m['title'] ?? '', d));
             break;
           case 'radar':
-            final cols = (m['cols'] as List?)?.cast<String>() ?? [];
-            final res = _radar(rows, cols);
-            if (res != null) {
+            final res = _radar(rows, (m['cols'] as List).cast<String>());
+            if (res != null)
               specs.add(
-                ChartSpec.radar(m['title'] ?? 'Radar', res.entries, res.labels),
+                ChartSpec.radar(m['title'] ?? '', res.entries, res.labels),
               );
-            }
         }
       } catch (e, st) {
-        _log('Chart build error for spec $m', error: e, st: st, lvl: 1000);
+        _log('Bad spec=$m', tag: 'charts', err: e, st: st, lvl: 800);
       }
     }
-    _log('charts() produced ${specs.length} specs');
-    return specs;
+    _log('Specs produced=${specs.length}', tag: 'charts');
+    return specs.isEmpty ? _fallbackCharts(rows, header) : specs;
   }
 
-  /* ---------- helpers ---------- */
+  /* ----- fallback if LLM fails ----- */
+  List<ChartSpec> _fallbackCharts(List<List> rows, List<String> header) {
+    _log('Fallback chart invoked', tag: 'charts', lvl: 600);
+    final idx = header.indexWhere(
+      (c) => rows
+          .skip(1)
+          .any((r) => num.tryParse('${r[header.indexOf(c)]}') != null),
+    );
+    if (idx < 0) return [];
+    final colName = header[idx];
+    final pts = _hist(rows, colName);
+    return pts.isEmpty
+        ? []
+        : [ChartSpec.histogram('$colName distribution', pts)];
+  }
 
-  String _buildPrompt(List<String> header, List<String> types) => '''
+  /* ----- helpers (identical to previous) ----- */
+
+  String _buildPrompt(List<String> h, List<String> t) => '''
 You are an expert data-visualisation assistant.
 Choose up to 3 charts that best reveal patterns.
 Return ONLY JSON array, no prose, no markdown.
 
 Columns:
-${[for (var i = 0; i < header.length; i++) '- ${header[i]} (${types[i]})'].join('\n')}
+${[for (var i = 0; i < h.length; i++) '- ${h[i]} (${t[i]})'].join('\n')}
 
 Schema:
 {"type":"scatter|line|bar|histogram|pie|radar",
@@ -317,12 +321,13 @@ Example:
  {"type":"scatter","x":"Height","y":"Weight","title":"Height vs Weight"}]
 ''';
 
-  List<String> _profile(List<List> rows) {
-    final len = rows.first.length;
+  List<String> _profile(List<List> r) {
+    final len = r.first.length;
     final out = List<String>.filled(len, 'cat');
-    for (final r in rows.skip(1)) {
+    for (final row in r.skip(1)) {
       for (var i = 0; i < len; i++) {
-        if (out[i] == 'cat' && num.tryParse('${r[i]}') != null) out[i] = 'num';
+        if (out[i] == 'cat' && num.tryParse('${row[i]}') != null)
+          out[i] = 'num';
       }
     }
     return out;
@@ -330,13 +335,11 @@ Example:
 
   String? _extractJson(String s) {
     final a = s.indexOf('['), b = s.lastIndexOf(']');
-    return a >= 0 && b > a ? s.substring(a, b + 1) : null;
+    return (a >= 0 && b > a) ? s.substring(a, b + 1) : null;
   }
 
-  /* scatter / line */
   List<FlSpot> _scatter(List<List> r, String x, String y) {
-    final h = r.first.cast<String>();
-    final xi = h.indexOf(x), yi = h.indexOf(y);
+    final h = r.first.cast<String>(), xi = h.indexOf(x), yi = h.indexOf(y);
     if (xi < 0 || yi < 0) return [];
     return [
       for (final row in r.skip(1))
@@ -349,22 +352,19 @@ Example:
   List<FlSpot> _line(List<List> r, String x, String y) =>
       _scatter(r, x, y)..sort((a, b) => a.x.compareTo(b.x));
 
-  /* bars */
   List<BarChartRodData> _bars(List<List> r, String x, String? y, String? agg) {
-    final h = r.first.cast<String>();
-    final xi = h.indexOf(x);
-    final yi = y != null ? h.indexOf(y) : -1;
+    final h = r.first.cast<String>(),
+        xi = h.indexOf(x),
+        yi = y != null ? h.indexOf(y) : -1;
     if (xi < 0) return [];
-
     final bucket = <String, List<double>>{};
     for (final row in r.skip(1)) {
-      final key = '${row[xi]}';
-      bucket.putIfAbsent(key, () => []);
+      final k = '${row[xi]}';
+      bucket.putIfAbsent(k, () => []);
       if (yi >= 0 && num.tryParse('${row[yi]}') != null) {
-        bucket[key]!.add(double.parse('${row[yi]}'));
+        bucket[k]!.add(double.parse('${row[yi]}'));
       }
     }
-
     final keys = bucket.keys.toList()..sort();
     return [
       for (final k in keys)
@@ -381,7 +381,6 @@ Example:
     ];
   }
 
-  /* histogram */
   List<FlSpot> _hist(List<List> r, String c) {
     final idx = r.first.cast<String>().indexOf(c);
     if (idx < 0) return [];
@@ -406,15 +405,15 @@ Example:
     ];
   }
 
-  /* pie */
   List<PieChartSectionData> _pie(
     List<List> r,
     String x,
     String? y,
     String? agg,
   ) {
-    final h = r.first.cast<String>();
-    final xi = h.indexOf(x), yi = y != null ? h.indexOf(y) : -1;
+    final h = r.first.cast<String>(),
+        xi = h.indexOf(x),
+        yi = y != null ? h.indexOf(y) : -1;
     if (xi < 0) return [];
     final bucket = <String, List<double>>{};
     for (final row in r.skip(1)) {
@@ -442,20 +441,16 @@ Example:
     ];
   }
 
-  /* radar */
   _RadarRes? _radar(List<List> r, List<String> cols) {
     if (cols.length < 3 || cols.length > 6) return null;
-    final h = r.first.cast<String>();
-    final idx = [for (final c in cols) h.indexOf(c)];
+    final h = r.first.cast<String>(), idx = [for (var c in cols) h.indexOf(c)];
     if (idx.any((i) => i < 0)) return null;
-
     final sums = List<double>.filled(idx.length, 0);
     var count = 0;
     for (final row in r.skip(1)) {
       if (idx.every((i) => num.tryParse('${row[i]}') != null)) {
-        for (var j = 0; j < idx.length; j++) {
+        for (var j = 0; j < idx.length; j++)
           sums[j] += double.parse('${row[idx[j]]}');
-        }
         count++;
       }
     }
@@ -464,27 +459,21 @@ Example:
     return _RadarRes(entries, cols);
   }
 
-  /* llama loader */
+  /* ---------- Llama loader ---------- */
+
   Llama? _ll;
   Future<Llama> _llama() async {
     if (_ll != null) return _ll!;
-    _log('Loading model…');
-    _ll = Llama(
-      LlamaController(modelPath: await _modelPath(), nCtx: 1024, greedy: true),
-    );
-    _log('Model ready');
-    return _ll!;
-  }
-
-  static Future<String> _modelPath() async {
-    final bytes = await rootBundle.load('assets/models/llama-3b.gguf');
     final dir = await getApplicationSupportDirectory();
-    final file = File(p.join(dir.path, 'llama-3b.gguf'));
-    if (!await file.exists()) {
-      _log('Copying model to ${file.path}');
-      await file.writeAsBytes(bytes.buffer.asUint8List());
+    final path = p.join(dir.path, 'llama-3b.gguf');
+    if (!await File(path).exists()) {
+      _log('Copying model to $path', tag: 'llama');
+      final bytes = await rootBundle.load('assets/models/llama-3b.gguf');
+      await File(path).writeAsBytes(bytes.buffer.asUint8List());
     }
-    return file.path;
+    _ll = Llama(LlamaController(modelPath: path, nCtx: 1024, greedy: true));
+    _log('Llama ready', tag: 'llama');
+    return _ll!;
   }
 }
 
@@ -494,11 +483,10 @@ class _RadarRes {
   _RadarRes(this.entries, this.labels);
 }
 
-/* ───── Application entry / UI ───── */
+/* ───── App bootstrap ───── */
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  _log('Starting PlotPad');
   final dir = await getApplicationDocumentsDirectory();
   final isar = await Isar.openAsync(
     schemas: [SheetSchema],
@@ -516,29 +504,25 @@ Future<void> main() async {
 class _App extends ConsumerWidget {
   const _App();
   @override
-  Widget build(ctx, ref) {
-    _log('Building _App');
-    return MaterialApp(
-      title: 'PlotPad',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-      home: const _Home(),
-    );
-  }
+  Widget build(ctx, ref) => MaterialApp(
+    title: 'PlotPad',
+    theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
+    home: const _Home(),
+  );
 }
 
-/* ───── Home list with Slidable actions ───── */
+/* ───── Home page ───── */
 
 class _Home extends ConsumerWidget {
   const _Home();
   @override
   Widget build(ctx, ref) {
-    _log('Building _Home');
     final list = ref.watch(viewP);
     final ctrl = ref.read(ctrlP);
 
-    Future<void> _renameSheet(Sheet s) async {
+    Future<void> _rename(Sheet s) async {
       final tc = TextEditingController(text: s.name);
-      final newName = await showDialog<String>(
+      final name = await showDialog<String>(
         context: ctx,
         builder:
             (_) => AlertDialog(
@@ -556,19 +540,19 @@ class _Home extends ConsumerWidget {
               ],
             ),
       );
-      if (newName != null && newName.isNotEmpty && newName != s.name) {
-        _log('Rename sheet id=${s.id} to "$newName"');
-        ref.read(dbP).write((i) => i.sheets.put(s..name = newName));
+      if (name != null && name.isNotEmpty) {
+        _log('Rename id=${s.id} → $name', tag: 'ui');
+        ref.read(dbP).write((i) => i.sheets.put(s..name = name));
       }
     }
 
-    Future<void> _deleteSheet(Sheet s) async {
+    Future<void> _delete(Sheet s) async {
       final ok = await showDialog<bool>(
         context: ctx,
         builder:
             (_) => AlertDialog(
               title: const Text('Delete sheet?'),
-              content: Text('This will permanently delete "${s.name}".'),
+              content: Text('Delete "${s.name}" permanently?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
@@ -585,15 +569,14 @@ class _Home extends ConsumerWidget {
             ),
       );
       if (ok == true) {
-        _log('Delete sheet id=${s.id}');
-        if (s.enc && s.secretId != null) {
+        _log('Delete id=${s.id}', tag: 'ui');
+        if (s.enc && s.secretId != null)
           await ctrl.storage.delete(key: s.secretId!);
-        }
         ref.read(dbP).write((i) => i.sheets.delete(s.id));
       }
     }
 
-    Future<void> _encryptSheet(Sheet s) async {
+    Future<void> _encrypt(Sheet s) async {
       final pwd = await showDialog<String>(
         context: ctx,
         builder: (_) {
@@ -618,7 +601,10 @@ class _Home extends ConsumerWidget {
           );
         },
       );
-      if (pwd != null && pwd.isNotEmpty) await ctrl.lock(s, pwd);
+      if (pwd != null && pwd.isNotEmpty) {
+        _log('Encrypt id=${s.id}', tag: 'ui');
+        await ctrl.lock(s, pwd);
+      }
     }
 
     return Scaffold(
@@ -632,10 +618,7 @@ class _Home extends ConsumerWidget {
                 prefixIcon: Icon(Icons.search),
                 hintText: 'Search…',
               ),
-              onChanged: (v) {
-                _log('Search query="$v"');
-                ref.read(queryP.notifier).state = v;
-              },
+              onChanged: (v) => ref.read(queryP.notifier).state = v,
             ),
           ),
           Expanded(
@@ -655,13 +638,13 @@ class _Home extends ConsumerWidget {
                               SlidableAction(
                                 icon: Icons.edit,
                                 label: 'Rename',
-                                onPressed: (_) => _renameSheet(s),
+                                onPressed: (_) => _rename(s),
                               ),
                               if (!s.enc)
                                 SlidableAction(
                                   icon: Icons.lock,
                                   label: 'Encrypt',
-                                  onPressed: (_) => _encryptSheet(s),
+                                  onPressed: (_) => _encrypt(s),
                                 ),
                               SlidableAction(
                                 backgroundColor:
@@ -670,7 +653,7 @@ class _Home extends ConsumerWidget {
                                     Theme.of(ctx).colorScheme.onErrorContainer,
                                 icon: Icons.delete,
                                 label: 'Delete',
-                                onPressed: (_) => _deleteSheet(s),
+                                onPressed: (_) => _delete(s),
                               ),
                             ],
                           ),
@@ -683,7 +666,7 @@ class _Home extends ConsumerWidget {
                               ],
                             ),
                             onTap: () {
-                              _log('Open sheet id=${s.id}');
+                              _log('Open id=${s.id}', tag: 'ui');
                               Navigator.push(
                                 ctx,
                                 MaterialPageRoute(builder: (_) => _Sheet(s)),
@@ -700,10 +683,10 @@ class _Home extends ConsumerWidget {
         child: const Icon(Icons.add),
         onPressed: () {
           final id = ref.read(dbP).sheets.autoIncrement();
-          _log('Creating new sheet id=$id');
+          _log('Create new id=$id', tag: 'ui');
           ref
               .read(dbP)
-              .write((i) => i.sheets.put(Sheet(name: 'Untitled')..id = id));
+              .write((i) => i.sheets.put(Sheet(name: 'Untitled $id')..id = id));
         },
       ),
     );
@@ -720,8 +703,18 @@ class _Sheet extends ConsumerStatefulWidget {
 }
 
 class _SheetState extends ConsumerState<_Sheet> {
-  late final _csvCtl = TextEditingController(text: widget.sheet.csv);
+  late final _csvCtl = TextEditingController(
+    text: widget.sheet.enc ? '' : widget.sheet.csv,
+  );
   final _tagCtl = TextEditingController();
+  bool _unlocked = false;
+  String _plainCsv = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.sheet.enc) Future.microtask(() => _promptPw(false));
+  }
 
   @override
   void dispose() {
@@ -730,52 +723,69 @@ class _SheetState extends ConsumerState<_Sheet> {
     super.dispose();
   }
 
+  Future<bool> _promptPw(bool set) async {
+    final ctrl = ref.read(ctrlP);
+    final pwd = await showDialog<String>(
+      context: context,
+      builder: (_) {
+        final t = TextEditingController();
+        return AlertDialog(
+          content: TextField(controller: t, obscureText: true, autofocus: true),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, t.text),
+              child: Text(set ? 'Save' : 'Unlock'),
+            ),
+          ],
+        );
+      },
+    );
+    if (pwd == null || pwd.isEmpty) return false;
+
+    if (set) {
+      _log('Encrypt via lock icon', tag: 'ui');
+      await ctrl.lock(widget.sheet, pwd);
+      setState(() {
+        _unlocked = false;
+        _csvCtl.text = '';
+        _plainCsv = '';
+      });
+      return true;
+    } else {
+      final raw = await ctrl.unlock(widget.sheet, pwd);
+      if (raw == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Wrong password')));
+        return false;
+      }
+      _log('Unlock success', tag: 'ui');
+      setState(() {
+        _unlocked = true;
+        _plainCsv = raw;
+        _csvCtl.text = raw;
+      });
+      return true;
+    }
+  }
+
   @override
   Widget build(ctx) {
-    final c = ref.read(ctrlP);
-
-    Future<void> _pwDialog(bool set) async {
-      final pwd = await showDialog<String>(
-        context: ctx,
-        builder: (_) {
-          final t = TextEditingController();
-          return AlertDialog(
-            content: TextField(controller: t, obscureText: true),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, t.text),
-                child: Text(set ? 'Save' : 'Unlock'),
-              ),
-            ],
-          );
-        },
-      );
-      if (pwd == null || pwd.isEmpty) return;
-      set
-          ? await c.lock(widget.sheet, pwd)
-          : await c.unlock(widget.sheet, pwd).then((raw) {
-            if (raw == null) {
-              ScaffoldMessenger.of(
-                ctx,
-              ).showSnackBar(const SnackBar(content: Text('Wrong password')));
-            } else {
-              setState(() => _csvCtl.text = raw);
-            }
-          });
-      setState(() {});
-    }
+    final ctrl = ref.read(ctrlP);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.sheet.name),
         actions: [
           IconButton(
-            icon: Icon(widget.sheet.enc ? Icons.lock : Icons.lock_open),
-            onPressed: () => _pwDialog(!widget.sheet.enc),
+            icon: Icon(
+              widget.sheet.enc && !_unlocked ? Icons.lock : Icons.lock_open,
+            ),
+            onPressed: () => _promptPw(widget.sheet.enc && !_unlocked),
           ),
         ],
       ),
@@ -785,11 +795,19 @@ class _SheetState extends ConsumerState<_Sheet> {
           TextField(
             controller: _csvCtl,
             maxLines: 5,
+            readOnly: widget.sheet.enc && !_unlocked,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               label: Text('CSV'),
             ),
-            onChanged: (v) => c.setCsv(widget.sheet, v),
+            onChanged: (v) {
+              _log('CSV edit len=${v.length}', tag: 'ui');
+              if (widget.sheet.enc && _unlocked) {
+                _plainCsv = v;
+              } else {
+                ctrl.setCsv(widget.sheet, v);
+              }
+            },
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -799,7 +817,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                 Chip(
                   label: Text(t),
                   onDeleted: () {
-                    _log('Remove tag "$t"');
+                    _log('Remove tag=$t', tag: 'ui');
                     ref.read(dbP).write((i) => widget.sheet.tags.remove(t));
                     setState(() {});
                   },
@@ -811,7 +829,10 @@ class _SheetState extends ConsumerState<_Sheet> {
                     context: ctx,
                     builder:
                         (_) => AlertDialog(
-                          content: TextField(controller: _tagCtl),
+                          content: TextField(
+                            controller: _tagCtl,
+                            autofocus: true,
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
@@ -826,7 +847,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                         ),
                   );
                   if (tag != null && tag.isNotEmpty) {
-                    _log('Add tag "$tag"');
+                    _log('Add tag=$tag', tag: 'ui');
                     ref.read(dbP).write((i) => widget.sheet.tags.add(tag));
                     _tagCtl.clear();
                     setState(() {});
@@ -840,8 +861,15 @@ class _SheetState extends ConsumerState<_Sheet> {
             icon: const Icon(Icons.insights),
             label: const Text('Generate charts'),
             onPressed: () async {
-              _log('Generate charts');
-              final specs = await c.charts(widget.sheet);
+              if (widget.sheet.enc && !_unlocked) {
+                final ok = await _promptPw(false);
+                if (!ok) return;
+              }
+              _log('Generate charts tapped', tag: 'ui');
+              final specs =
+                  widget.sheet.enc
+                      ? await ctrl.chartsOnCsv(_plainCsv)
+                      : await ctrl.charts(widget.sheet);
               if (!mounted) return;
               Navigator.push(
                 ctx,
