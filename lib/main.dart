@@ -1,8 +1,3 @@
-// main.dart  ────────────────────────────────────────────────────────────────
-// PlotPad • encrypt CSV sheets, tag + search them, and let a bundled Llama
-// model pick the best fl_chart visual (scatter, line, bar, histogram, pie,
-// radar).  This version adds **full structured logging** via dart:developer.
-// ----------------------------------------------------------------------------
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'dart:io';
@@ -31,14 +26,15 @@ void _log(
   Object? error,
   StackTrace? st,
   int lvl = 0, // 0-info, 500-warning, 1000-error
-}) => dev.log(
-  msg,
-  name: 'PlotPad',
-  level: lvl,
-  error: error,
-  stackTrace: st,
-  time: DateTime.now(),
-);
+}) =>
+    dev.log(
+      msg,
+      name: 'PlotPad',
+      level: lvl,
+      error: error,
+      stackTrace: st,
+      time: DateTime.now(),
+    );
 
 /* ───── Riverpod providers ───── */
 
@@ -143,18 +139,17 @@ class Ctrl {
   final Isar db;
   final FlutterSecureStorage storage;
 
-  /* ---------- cryptography ---------- */
+/* ---------- cryptography ---------- */
 
   static const _rounds = 10000;
   Future<Uint8List> _key(String pwd, List<int> salt) async {
     _log('Deriving PBKDF2 key');
     return Uint8List.fromList(
       await crypto.Pbkdf2(
-            macAlgorithm: crypto.Hmac.sha256(),
-            iterations: _rounds,
-            bits: 256,
-          )
-          .deriveKey(secretKey: crypto.SecretKey(utf8.encode(pwd)), nonce: salt)
+        macAlgorithm: crypto.Hmac.sha256(),
+        iterations: _rounds,
+        bits: 256,
+      ).deriveKey(secretKey: crypto.SecretKey(utf8.encode(pwd)), nonce: salt)
           .then((k) => k.extractBytes()),
     );
   }
@@ -162,7 +157,7 @@ class Ctrl {
   enc.Encrypter _aes(Uint8List k) =>
       enc.Encrypter(enc.AES(enc.Key(k), mode: enc.AESMode.cbc));
 
-  /* ---------- lock / unlock ---------- */
+/* ---------- lock / unlock ---------- */
 
   Future<void> lock(Sheet s, String pwd) async {
     if (s.csv.trim().isEmpty) return;
@@ -216,14 +211,13 @@ class Ctrl {
     db.write((i) => i.sheets.put(s..csv = csv));
   }
 
-  /* ---------- LLM-driven chart generation ---------- */
+/* ---------- LLM-driven chart generation ---------- */
 
   Future<List<ChartSpec>> charts(Sheet s) async {
     _log('charts() start for id=${s.id}');
     // 1. parse CSV
-    final rows = const CsvToListConverter(
-      eol: '\n',
-    ).convert(s.csv.replaceAll(r'\n', '\n'));
+    final rows = const CsvToListConverter(eol: '\n')
+        .convert(s.csv.replaceAll(r'\n', '\n'));
     if (rows.length < 2) {
       _log('Not enough rows for charting', lvl: 500);
       return [];
@@ -238,7 +232,7 @@ class Ctrl {
     final resp = await llama
         .prompt([UserLlamaMessage(prompt)])
         .fold<String>('', (a, b) => a + b);
-    llama.stop(); // reset KV-cache
+    llama.reload(); // reset KV-cache
     _log('LLM response chars=${resp.length}');
 
     // 3. extract JSON
@@ -301,11 +295,11 @@ class Ctrl {
     return specs;
   }
 
-  /* ---------- helpers ---------- */
+/* ---------- helpers ---------- */
 
   String _buildPrompt(List<String> header, List<String> types) => '''
 You are an expert data-visualisation assistant.
-Choose up to 5 charts that best reveal patterns.
+Choose up to 3 charts that best reveal patterns.
 Return ONLY JSON array, no prose, no markdown.
 
 Columns:
@@ -336,7 +330,7 @@ Example:
     return a >= 0 && b > a ? s.substring(a, b + 1) : null;
   }
 
-  /* scatter / line */
+/* scatter / line */
   List<FlSpot> _scatter(List<List> r, String x, String y) {
     final h = r.first.cast<String>();
     final xi = h.indexOf(x), yi = h.indexOf(y);
@@ -352,7 +346,7 @@ Example:
   List<FlSpot> _line(List<List> r, String x, String y) =>
       _scatter(r, x, y)..sort((a, b) => a.x.compareTo(b.x));
 
-  /* bars */
+/* bars */
   List<BarChartRodData> _bars(List<List> r, String x, String? y, String? agg) {
     final h = r.first.cast<String>();
     final xi = h.indexOf(x);
@@ -374,28 +368,26 @@ Example:
         BarChartRodData(
           toY: switch (agg) {
             'sum' => bucket[k]!.fold(0.0, (a, b) => a + b),
-            'avg' =>
-              bucket[k]!.isEmpty
-                  ? 0
-                  : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
+            'avg' => bucket[k]!.isEmpty
+                ? 0
+                : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
             _ => bucket[k]!.isEmpty ? 1 : bucket[k]!.length.toDouble(),
           },
         ),
     ];
   }
 
-  /* histogram */
+/* histogram */
   List<FlSpot> _hist(List<List> r, String c) {
     final idx = r.first.cast<String>().indexOf(c);
     if (idx < 0) return [];
-    final nums =
-        r
-            .skip(1)
-            .map((e) => num.tryParse('${e[idx]}'))
-            .whereType<num>()
-            .map((e) => e.toDouble())
-            .toList()
-          ..sort();
+    final nums = r
+        .skip(1)
+        .map((e) => num.tryParse('${e[idx]}'))
+        .whereType<num>()
+        .map((e) => e.toDouble())
+        .toList()
+      ..sort();
     if (nums.isEmpty) return [];
     final bins = max(5, sqrt(nums.length).round());
     final minV = nums.first, step = (nums.last - minV) / bins;
@@ -409,7 +401,7 @@ Example:
     ];
   }
 
-  /* pie */
+/* pie */
   List<PieChartSectionData> _pie(
     List<List> r,
     String x,
@@ -434,10 +426,9 @@ Example:
           title: k,
           value: switch (agg) {
             'sum' => bucket[k]!.fold(0.0, (a, b) => a! + b),
-            'avg' =>
-              bucket[k]!.isEmpty
-                  ? 0
-                  : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
+            'avg' => bucket[k]!.isEmpty
+                ? 0
+                : bucket[k]!.reduce((a, b) => a + b) / bucket[k]!.length,
             _ => bucket[k]!.isEmpty ? 1 : bucket[k]!.length.toDouble(),
           },
           radius: 50,
@@ -445,7 +436,7 @@ Example:
     ];
   }
 
-  /* radar */
+/* radar */
   _RadarRes? _radar(List<List> r, List<String> cols) {
     if (cols.length < 3 || cols.length > 6) return null;
     final h = r.first.cast<String>();
@@ -467,7 +458,7 @@ Example:
     return _RadarRes(entries, cols);
   }
 
-  /* llama loader */
+/* llama loader */
   Llama? _ll;
   Future<Llama> _llama() async {
     if (_ll != null) return _ll!;
@@ -535,6 +526,62 @@ class _Home extends ConsumerWidget {
   Widget build(ctx, ref) {
     _log('Building _Home');
     final list = ref.watch(viewP);
+    final ctrl = ref.read(ctrlP);
+
+    Future<void> _renameSheet(Sheet s) async {
+      final tc = TextEditingController(text: s.name);
+      final newName = await showDialog<String>(
+        context: ctx,
+        builder: (_) => AlertDialog(
+          title: const Text('Rename sheet'),
+          content: TextField(controller: tc, autofocus: true),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, tc.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+      if (newName != null && newName.isNotEmpty && newName != s.name) {
+        _log('Rename sheet id=${s.id} to "$newName"');
+        ref.read(dbP).write((i) => i.sheets.put(s..name = newName));
+      }
+    }
+
+    Future<void> _deleteSheet(Sheet s) async {
+      final ok = await showDialog<bool>(
+        context: ctx,
+        builder: (_) => AlertDialog(
+          title: const Text('Delete sheet?'),
+          content: Text('This will permanently delete "${s.name}".'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (ok == true) {
+        _log('Delete sheet id=${s.id}');
+        if (s.enc && s.secretId != null) {
+          await ctrl.storage.delete(key: s.secretId!);
+        }
+        ref.read(dbP).write((i) => i.sheets.delete(s.id));
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('PlotPad')),
       body: Column(
@@ -553,32 +600,44 @@ class _Home extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child:
-                list.isEmpty
-                    ? const Center(child: Text('No sheets yet'))
-                    : ListView.builder(
-                      itemCount: list.length,
-                      itemBuilder:
-                          (_, i) => ListTile(
-                            title: Text(list[i].name),
-                            subtitle: Wrap(
-                              spacing: 4,
-                              children: [
-                                for (var t in list[i].tags)
-                                  Chip(label: Text(t)),
-                              ],
-                            ),
-                            onTap: () {
-                              _log('Open sheet id=${list[i].id}');
-                              Navigator.push(
-                                ctx,
-                                MaterialPageRoute(
-                                  builder: (_) => _Sheet(list[i]),
-                                ),
-                              );
-                            },
+            child: list.isEmpty
+                ? const Center(child: Text('No sheets yet'))
+                : ListView.builder(
+                    itemCount: list.length,
+                    itemBuilder: (_, i) => ListTile(
+                      title: Text(list[i].name),
+                      subtitle: Wrap(
+                        spacing: 4,
+                        children: [
+                          for (var t in list[i].tags) Chip(label: Text(t)),
+                        ],
+                      ),
+                      onTap: () {
+                        _log('Open sheet id=${list[i].id}');
+                        Navigator.push(
+                          ctx,
+                          MaterialPageRoute(
+                            builder: (_) => _Sheet(list[i]),
                           ),
+                        );
+                      },
+                      trailing: Wrap(
+                        spacing: 4,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit),
+                            tooltip: 'Rename',
+                            onPressed: () => _renameSheet(list[i]),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete),
+                            tooltip: 'Delete',
+                            onPressed: () => _deleteSheet(list[i]),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
           ),
         ],
       ),
@@ -642,14 +701,13 @@ class _SheetState extends ConsumerState<_Sheet> {
       set
           ? await c.lock(widget.sheet, pwd)
           : await c.unlock(widget.sheet, pwd).then((raw) {
-            if (raw == null) {
-              ScaffoldMessenger.of(
-                ctx,
-              ).showSnackBar(const SnackBar(content: Text('Wrong password')));
-            } else {
-              setState(() => _csvCtl.text = raw);
-            }
-          });
+              if (raw == null) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Wrong password')));
+              } else {
+                setState(() => _csvCtl.text = raw);
+              }
+            });
       setState(() {});
     }
 
@@ -693,21 +751,20 @@ class _SheetState extends ConsumerState<_Sheet> {
                 onPressed: () async {
                   final tag = await showDialog<String>(
                     context: ctx,
-                    builder:
-                        (_) => AlertDialog(
-                          content: TextField(controller: _tagCtl),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed:
-                                  () => Navigator.pop(ctx, _tagCtl.text.trim()),
-                              child: const Text('Add'),
-                            ),
-                          ],
+                    builder: (_) => AlertDialog(
+                      content: TextField(controller: _tagCtl),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
                         ),
+                        ElevatedButton(
+                          onPressed: () =>
+                              Navigator.pop(ctx, _tagCtl.text.trim()),
+                          child: const Text('Add'),
+                        ),
+                      ],
+                    ),
                   );
                   if (tag != null && tag.isNotEmpty) {
                     _log('Add tag "$tag" to id=${widget.sheet.id}');
@@ -744,26 +801,24 @@ class _Charts extends StatelessWidget {
   final List<ChartSpec> specs;
   @override
   Widget build(ctx) => Scaffold(
-    appBar: AppBar(title: const Text('Charts')),
-    body:
-        specs.isEmpty
+        appBar: AppBar(title: const Text('Charts')),
+        body: specs.isEmpty
             ? const Center(child: Text('No numeric data'))
             : PageView.builder(
-              itemCount: specs.length,
-              itemBuilder:
-                  (_, i) => Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Text(
-                          specs[i].title,
-                          style: Theme.of(ctx).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(child: specs[i].view),
-                      ],
-                    ),
+                itemCount: specs.length,
+                itemBuilder: (_, i) => Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        specs[i].title,
+                        style: Theme.of(ctx).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(child: specs[i].view),
+                    ],
                   ),
-            ),
-  );
+                ),
+              ),
+      );
 }
