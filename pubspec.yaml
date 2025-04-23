@@ -1,6 +1,6 @@
 name: plotpad
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:
@@ -10,15 +10,17 @@ dependencies:
   flutter:
     sdk: flutter
   fl_chart: ^0.71.0
-  ollama_dart: ^0.2.2+1
-  isar: ^4.0.0-dev.3
-  isar_flutter_libs: ^4.0.0-dev.3
+  llama_sdk: ^0.0.4
+  isar: ^4.0.0-dev.14
+  isar_flutter_libs: ^4.0.0-dev.14
   flutter_secure_storage: ^4.2.1
   encrypt: ^5.0.3
   csv: ^6.0.0
   flutter_riverpod: ^2.6.1
   path_provider: ^2.1.5
   build_runner: ^2.4.13
+  cryptography_flutter: ^2.3.2
+  cryptography: ^2.7.0
 
 dev_dependencies:
   flutter_test:
@@ -27,3 +29,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/models/llama-3b.gguf

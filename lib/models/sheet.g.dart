@@ -8,43 +8,75 @@ part of 'sheet.dart';
 
 // coverage:ignore-file
 // ignore_for_file: duplicate_ignore, invalid_use_of_protected_member, lines_longer_than_80_chars, constant_identifier_names, avoid_js_rounded_ints, no_leading_underscores_for_local_identifiers, require_trailing_commas, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_in_if_null_operators, library_private_types_in_public_api, prefer_const_constructors
+// ignore_for_file: type=lint
 
 extension GetSheetCollection on Isar {
   IsarCollection<int, Sheet> get sheets => this.collection();
 }
 
-const SheetSchema = IsarCollectionSchema(
-  schema:
-      '{"name":"Sheet","idName":"id","properties":[{"name":"name","type":"String"},{"name":"csvContent","type":"String"},{"name":"isEncrypted","type":"Bool"},{"name":"passwordKeyName","type":"String"}]}',
+const SheetSchema = IsarGeneratedSchema(
+  schema: IsarSchema(
+    name: 'Sheet',
+    idName: 'id',
+    embedded: false,
+    properties: [
+      IsarPropertySchema(
+        name: 'name',
+        type: IsarType.string,
+      ),
+      IsarPropertySchema(
+        name: 'csvContent',
+        type: IsarType.string,
+      ),
+      IsarPropertySchema(
+        name: 'isEncrypted',
+        type: IsarType.bool,
+      ),
+      IsarPropertySchema(
+        name: 'passwordKeyName',
+        type: IsarType.string,
+      ),
+      IsarPropertySchema(
+        name: 'tags',
+        type: IsarType.stringList,
+      ),
+    ],
+    indexes: [],
+  ),
   converter: IsarObjectConverter<int, Sheet>(
     serialize: serializeSheet,
     deserialize: deserializeSheet,
     deserializeProperty: deserializeSheetProp,
   ),
   embeddedSchemas: [],
-  hash: -7750474030069459675,
 );
 
 @isarProtected
 int serializeSheet(IsarWriter writer, Sheet object) {
-  IsarCore.writeString(writer, 1, IsarCore.toNativeString(object.name));
-  IsarCore.writeString(writer, 2, IsarCore.toNativeString(object.csvContent));
+  IsarCore.writeString(writer, 1, object.name);
+  IsarCore.writeString(writer, 2, object.csvContent);
   IsarCore.writeBool(writer, 3, object.isEncrypted);
   {
     final value = object.passwordKeyName;
     if (value == null) {
       IsarCore.writeNull(writer, 4);
     } else {
-      IsarCore.writeString(writer, 4, IsarCore.toNativeString(value));
+      IsarCore.writeString(writer, 4, value);
     }
+  }
+  {
+    final list = object.tags;
+    final listWriter = IsarCore.beginList(writer, 5, list.length);
+    for (var i = 0; i < list.length; i++) {
+      IsarCore.writeString(listWriter, i, list[i]);
+    }
+    IsarCore.endList(writer, listWriter);
   }
   return object.id;
 }
 
 @isarProtected
 Sheet deserializeSheet(IsarReader reader) {
-  final int _id;
-  _id = IsarCore.readId(reader);
   final String _name;
   _name = IsarCore.readString(reader, 1) ?? '';
   final String _csvContent;
@@ -53,13 +85,31 @@ Sheet deserializeSheet(IsarReader reader) {
   _isEncrypted = IsarCore.readBool(reader, 3);
   final String? _passwordKeyName;
   _passwordKeyName = IsarCore.readString(reader, 4);
+  final List<String> _tags;
+  {
+    final length = IsarCore.readList(reader, 5, IsarCore.readerPtrPtr);
+    {
+      final reader = IsarCore.readerPtr;
+      if (reader.isNull) {
+        _tags = const [];
+      } else {
+        final list = List<String>.filled(length, '', growable: true);
+        for (var i = 0; i < length; i++) {
+          list[i] = IsarCore.readString(reader, i) ?? '';
+        }
+        IsarCore.freeReader(reader);
+        _tags = list;
+      }
+    }
+  }
   final object = Sheet(
-    id: _id,
     name: _name,
     csvContent: _csvContent,
     isEncrypted: _isEncrypted,
     passwordKeyName: _passwordKeyName,
+    tags: _tags,
   );
+  object.id = IsarCore.readId(reader);
   return object;
 }
 
@@ -76,6 +126,23 @@ dynamic deserializeSheetProp(IsarReader reader, int property) {
       return IsarCore.readBool(reader, 3);
     case 4:
       return IsarCore.readString(reader, 4);
+    case 5:
+      {
+        final length = IsarCore.readList(reader, 5, IsarCore.readerPtrPtr);
+        {
+          final reader = IsarCore.readerPtr;
+          if (reader.isNull) {
+            return const [];
+          } else {
+            final list = List<String>.filled(length, '', growable: true);
+            for (var i = 0; i < length; i++) {
+              list[i] = IsarCore.readString(reader, i) ?? '';
+            }
+            IsarCore.freeReader(reader);
+            return list;
+          }
+        }
+      }
     default:
       throw ArgumentError('Unknown property: $property');
   }
@@ -189,6 +256,40 @@ extension SheetQueryUpdate on IsarQuery<Sheet> {
   _SheetQueryUpdate get updateFirst => _SheetQueryUpdateImpl(this, limit: 1);
 
   _SheetQueryUpdate get updateAll => _SheetQueryUpdateImpl(this);
+}
+
+class _SheetQueryBuilderUpdateImpl implements _SheetQueryUpdate {
+  const _SheetQueryBuilderUpdateImpl(this.query, {this.limit});
+
+  final QueryBuilder<Sheet, Sheet, QOperations> query;
+  final int? limit;
+
+  @override
+  int call({
+    Object? name = ignore,
+    Object? csvContent = ignore,
+    Object? isEncrypted = ignore,
+    Object? passwordKeyName = ignore,
+  }) {
+    final q = query.build();
+    try {
+      return q.updateProperties(limit: limit, {
+        if (name != ignore) 1: name as String?,
+        if (csvContent != ignore) 2: csvContent as String?,
+        if (isEncrypted != ignore) 3: isEncrypted as bool?,
+        if (passwordKeyName != ignore) 4: passwordKeyName as String?,
+      });
+    } finally {
+      q.close();
+    }
+  }
+}
+
+extension SheetQueryBuilderUpdate on QueryBuilder<Sheet, Sheet, QOperations> {
+  _SheetQueryUpdate get updateFirst =>
+      _SheetQueryBuilderUpdateImpl(this, limit: 1);
+
+  _SheetQueryUpdate get updateAll => _SheetQueryBuilderUpdateImpl(this);
 }
 
 extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
@@ -814,6 +915,192 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
       );
     });
   }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        EqualCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementGreaterThan(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        GreaterCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition>
+      tagsElementGreaterThanOrEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        GreaterOrEqualCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementLessThan(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        LessCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition>
+      tagsElementLessThanOrEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        LessOrEqualCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementBetween(
+    String lower,
+    String upper, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        BetweenCondition(
+          property: 5,
+          lower: lower,
+          upper: upper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        StartsWithCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        EndsWithCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        ContainsCondition(
+          property: 5,
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        MatchesCondition(
+          property: 5,
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const EqualCondition(
+          property: 5,
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const GreaterCondition(
+          property: 5,
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsIsEmpty() {
+    return not().tagsIsNotEmpty();
+  }
+
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> tagsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const GreaterOrEqualCondition(property: 5, value: null),
+      );
+    });
+  }
 }
 
 extension SheetQueryObject on QueryBuilder<Sheet, Sheet, QFilterCondition> {}
@@ -1002,6 +1289,12 @@ extension SheetQueryWhereDistinct on QueryBuilder<Sheet, Sheet, QDistinct> {
       return query.addDistinctBy(4, caseSensitive: caseSensitive);
     });
   }
+
+  QueryBuilder<Sheet, Sheet, QAfterDistinct> distinctByTags() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(5);
+    });
+  }
 }
 
 extension SheetQueryProperty1 on QueryBuilder<Sheet, Sheet, QProperty> {
@@ -1032,6 +1325,12 @@ extension SheetQueryProperty1 on QueryBuilder<Sheet, Sheet, QProperty> {
   QueryBuilder<Sheet, String?, QAfterProperty> passwordKeyNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(4);
+    });
+  }
+
+  QueryBuilder<Sheet, List<String>, QAfterProperty> tagsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addProperty(5);
     });
   }
 }
@@ -1066,6 +1365,12 @@ extension SheetQueryProperty2<R> on QueryBuilder<Sheet, R, QAfterProperty> {
       return query.addProperty(4);
     });
   }
+
+  QueryBuilder<Sheet, (R, List<String>), QAfterProperty> tagsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addProperty(5);
+    });
+  }
 }
 
 extension SheetQueryProperty3<R1, R2>
@@ -1098,6 +1403,12 @@ extension SheetQueryProperty3<R1, R2>
       passwordKeyNameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(4);
+    });
+  }
+
+  QueryBuilder<Sheet, (R1, R2, List<String>), QOperations> tagsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addProperty(5);
     });
   }
 }
