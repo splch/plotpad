@@ -2,8 +2,6 @@ PODS:
   - FlutterMacOS (1.0.0)
   - isar_flutter_libs (1.0.0):
     - FlutterMacOS
-  - llama_cpp_dart (0.0.1):
-    - FlutterMacOS
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -11,7 +9,6 @@ PODS:
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
   - isar_flutter_libs (from `Flutter/ephemeral/.symlinks/plugins/isar_flutter_libs/macos`)
-  - llama_cpp_dart (from `Flutter/ephemeral/.symlinks/plugins/llama_cpp_dart/macos`)
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
 
 EXTERNAL SOURCES:
@@ -19,15 +16,12 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
   isar_flutter_libs:
     :path: Flutter/ephemeral/.symlinks/plugins/isar_flutter_libs/macos
-  llama_cpp_dart:
-    :path: Flutter/ephemeral/.symlinks/plugins/llama_cpp_dart/macos
   path_provider_foundation:
     :path: Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin
 
 SPEC CHECKSUMS:
   FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
   isar_flutter_libs: a65381780401f81ad6bf3f2e7cd0de5698fb98c4
-  llama_cpp_dart: b008279ca44d337a11ed08bb1ca8703928dffeb6
   path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
 
 PODFILE CHECKSUM: 7eb978b976557c8c1cd717d8185ec483fd090a82

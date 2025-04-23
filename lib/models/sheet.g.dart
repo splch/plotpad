@@ -8,56 +8,34 @@ part of 'sheet.dart';
 
 // coverage:ignore-file
 // ignore_for_file: duplicate_ignore, invalid_use_of_protected_member, lines_longer_than_80_chars, constant_identifier_names, avoid_js_rounded_ints, no_leading_underscores_for_local_identifiers, require_trailing_commas, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_in_if_null_operators, library_private_types_in_public_api, prefer_const_constructors
-// ignore_for_file: type=lint
 
 extension GetSheetCollection on Isar {
   IsarCollection<int, Sheet> get sheets => this.collection();
 }
 
-const SheetSchema = IsarGeneratedSchema(
-  schema: IsarSchema(
-    name: 'Sheet',
-    idName: 'id',
-    embedded: false,
-    properties: [
-      IsarPropertySchema(
-        name: 'name',
-        type: IsarType.string,
-      ),
-      IsarPropertySchema(
-        name: 'csvContent',
-        type: IsarType.string,
-      ),
-      IsarPropertySchema(
-        name: 'isEncrypted',
-        type: IsarType.bool,
-      ),
-      IsarPropertySchema(
-        name: 'passwordKeyName',
-        type: IsarType.string,
-      ),
-    ],
-    indexes: [],
-  ),
+const SheetSchema = IsarCollectionSchema(
+  schema:
+      '{"name":"Sheet","idName":"id","properties":[{"name":"name","type":"String"},{"name":"csvContent","type":"String"},{"name":"isEncrypted","type":"Bool"},{"name":"passwordKeyName","type":"String"}]}',
   converter: IsarObjectConverter<int, Sheet>(
     serialize: serializeSheet,
     deserialize: deserializeSheet,
     deserializeProperty: deserializeSheetProp,
   ),
   embeddedSchemas: [],
+  hash: -7750474030069459675,
 );
 
 @isarProtected
 int serializeSheet(IsarWriter writer, Sheet object) {
-  IsarCore.writeString(writer, 1, object.name);
-  IsarCore.writeString(writer, 2, object.csvContent);
+  IsarCore.writeString(writer, 1, IsarCore.toNativeString(object.name));
+  IsarCore.writeString(writer, 2, IsarCore.toNativeString(object.csvContent));
   IsarCore.writeBool(writer, 3, object.isEncrypted);
   {
     final value = object.passwordKeyName;
     if (value == null) {
       IsarCore.writeNull(writer, 4);
     } else {
-      IsarCore.writeString(writer, 4, value);
+      IsarCore.writeString(writer, 4, IsarCore.toNativeString(value));
     }
   }
   return object.id;
@@ -211,40 +189,6 @@ extension SheetQueryUpdate on IsarQuery<Sheet> {
   _SheetQueryUpdate get updateFirst => _SheetQueryUpdateImpl(this, limit: 1);
 
   _SheetQueryUpdate get updateAll => _SheetQueryUpdateImpl(this);
-}
-
-class _SheetQueryBuilderUpdateImpl implements _SheetQueryUpdate {
-  const _SheetQueryBuilderUpdateImpl(this.query, {this.limit});
-
-  final QueryBuilder<Sheet, Sheet, QOperations> query;
-  final int? limit;
-
-  @override
-  int call({
-    Object? name = ignore,
-    Object? csvContent = ignore,
-    Object? isEncrypted = ignore,
-    Object? passwordKeyName = ignore,
-  }) {
-    final q = query.build();
-    try {
-      return q.updateProperties(limit: limit, {
-        if (name != ignore) 1: name as String?,
-        if (csvContent != ignore) 2: csvContent as String?,
-        if (isEncrypted != ignore) 3: isEncrypted as bool?,
-        if (passwordKeyName != ignore) 4: passwordKeyName as String?,
-      });
-    } finally {
-      q.close();
-    }
-  }
-}
-
-extension SheetQueryBuilderUpdate on QueryBuilder<Sheet, Sheet, QOperations> {
-  _SheetQueryUpdate get updateFirst =>
-      _SheetQueryBuilderUpdateImpl(this, limit: 1);
-
-  _SheetQueryUpdate get updateAll => _SheetQueryBuilderUpdateImpl(this);
 }
 
 extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
