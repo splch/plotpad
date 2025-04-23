@@ -100,8 +100,9 @@ class SheetController {
   }
 
   Future<String?> unlock(Sheet sheet, String password) async {
-    if (!sheet.isEncrypted || sheet.passwordKeyName == null)
+    if (!sheet.isEncrypted || sheet.passwordKeyName == null) {
       return sheet.csvContent;
+    }
     final keyStr = await _storage.read(key: sheet.passwordKeyName!);
     if (keyStr == null) return null;
     final encrypter = await _buildEncrypter(keyStr);
@@ -177,7 +178,9 @@ $sample
 
     final tokens = llama.prompt([UserLlamaMessage(prompt)]);
     final buf = StringBuffer();
-    await for (var t in tokens) buf.write(t);
+    await for (var t in tokens) {
+      buf.write(t);
+    }
     final raw = buf.toString();
     debugPrint('Model response: $raw');
 
