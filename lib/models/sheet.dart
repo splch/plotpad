@@ -4,30 +4,13 @@ part 'sheet.g.dart';
 
 @collection
 class Sheet {
-  /// Primary key – assigned with `isar.sheets.autoIncrement()`
   @Id()
-  late int id;
+  late int id; // autoIncrement() on insert
+  String name; // display name
+  String csv = ''; // raw CSV (encrypted when [enc]=true)
+  bool enc = false; // is encrypted?
+  String? secretId; // secure-storage payload key
+  List<String> tags = []; // free-form tags
 
-  /// Display name
-  late String name;
-
-  /// Raw CSV (may be AES-encrypted when [isEncrypted] is true)
-  late String csvContent;
-
-  /// If true, [csvContent] is encrypted and a key is stored in secure storage
-  late bool isEncrypted;
-
-  /// Secure-storage key name for the 32-byte AES key (null if not encrypted)
-  String? passwordKeyName;
-
-  /// Free-form tags (no element-wise index support in Isar v4)
-  List<String> tags = [];
-
-  Sheet({
-    required this.name,
-    this.csvContent = '',
-    this.isEncrypted = false,
-    this.passwordKeyName,
-    List<String> tags = const [],
-  }) : tags = List<String>.from(tags);
+  Sheet({required this.name});
 }

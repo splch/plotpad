@@ -25,15 +25,15 @@ const SheetSchema = IsarGeneratedSchema(
         type: IsarType.string,
       ),
       IsarPropertySchema(
-        name: 'csvContent',
+        name: 'csv',
         type: IsarType.string,
       ),
       IsarPropertySchema(
-        name: 'isEncrypted',
+        name: 'enc',
         type: IsarType.bool,
       ),
       IsarPropertySchema(
-        name: 'passwordKeyName',
+        name: 'secretId',
         type: IsarType.string,
       ),
       IsarPropertySchema(
@@ -54,10 +54,10 @@ const SheetSchema = IsarGeneratedSchema(
 @isarProtected
 int serializeSheet(IsarWriter writer, Sheet object) {
   IsarCore.writeString(writer, 1, object.name);
-  IsarCore.writeString(writer, 2, object.csvContent);
-  IsarCore.writeBool(writer, 3, object.isEncrypted);
+  IsarCore.writeString(writer, 2, object.csv);
+  IsarCore.writeBool(writer, 3, object.enc);
   {
-    final value = object.passwordKeyName;
+    final value = object.secretId;
     if (value == null) {
       IsarCore.writeNull(writer, 4);
     } else {
@@ -79,37 +79,29 @@ int serializeSheet(IsarWriter writer, Sheet object) {
 Sheet deserializeSheet(IsarReader reader) {
   final String _name;
   _name = IsarCore.readString(reader, 1) ?? '';
-  final String _csvContent;
-  _csvContent = IsarCore.readString(reader, 2) ?? '';
-  final bool _isEncrypted;
-  _isEncrypted = IsarCore.readBool(reader, 3);
-  final String? _passwordKeyName;
-  _passwordKeyName = IsarCore.readString(reader, 4);
-  final List<String> _tags;
+  final object = Sheet(
+    name: _name,
+  );
+  object.id = IsarCore.readId(reader);
+  object.csv = IsarCore.readString(reader, 2) ?? '';
+  object.enc = IsarCore.readBool(reader, 3);
+  object.secretId = IsarCore.readString(reader, 4);
   {
     final length = IsarCore.readList(reader, 5, IsarCore.readerPtrPtr);
     {
       final reader = IsarCore.readerPtr;
       if (reader.isNull) {
-        _tags = const [];
+        object.tags = const <String>[];
       } else {
         final list = List<String>.filled(length, '', growable: true);
         for (var i = 0; i < length; i++) {
           list[i] = IsarCore.readString(reader, i) ?? '';
         }
         IsarCore.freeReader(reader);
-        _tags = list;
+        object.tags = list;
       }
     }
   }
-  final object = Sheet(
-    name: _name,
-    csvContent: _csvContent,
-    isEncrypted: _isEncrypted,
-    passwordKeyName: _passwordKeyName,
-    tags: _tags,
-  );
-  object.id = IsarCore.readId(reader);
   return object;
 }
 
@@ -132,7 +124,7 @@ dynamic deserializeSheetProp(IsarReader reader, int property) {
         {
           final reader = IsarCore.readerPtr;
           if (reader.isNull) {
-            return const [];
+            return const <String>[];
           } else {
             final list = List<String>.filled(length, '', growable: true);
             for (var i = 0; i < length; i++) {
@@ -152,9 +144,9 @@ sealed class _SheetUpdate {
   bool call({
     required int id,
     String? name,
-    String? csvContent,
-    bool? isEncrypted,
-    String? passwordKeyName,
+    String? csv,
+    bool? enc,
+    String? secretId,
   });
 }
 
@@ -167,17 +159,17 @@ class _SheetUpdateImpl implements _SheetUpdate {
   bool call({
     required int id,
     Object? name = ignore,
-    Object? csvContent = ignore,
-    Object? isEncrypted = ignore,
-    Object? passwordKeyName = ignore,
+    Object? csv = ignore,
+    Object? enc = ignore,
+    Object? secretId = ignore,
   }) {
     return collection.updateProperties([
           id
         ], {
           if (name != ignore) 1: name as String?,
-          if (csvContent != ignore) 2: csvContent as String?,
-          if (isEncrypted != ignore) 3: isEncrypted as bool?,
-          if (passwordKeyName != ignore) 4: passwordKeyName as String?,
+          if (csv != ignore) 2: csv as String?,
+          if (enc != ignore) 3: enc as bool?,
+          if (secretId != ignore) 4: secretId as String?,
         }) >
         0;
   }
@@ -187,9 +179,9 @@ sealed class _SheetUpdateAll {
   int call({
     required List<int> id,
     String? name,
-    String? csvContent,
-    bool? isEncrypted,
-    String? passwordKeyName,
+    String? csv,
+    bool? enc,
+    String? secretId,
   });
 }
 
@@ -202,15 +194,15 @@ class _SheetUpdateAllImpl implements _SheetUpdateAll {
   int call({
     required List<int> id,
     Object? name = ignore,
-    Object? csvContent = ignore,
-    Object? isEncrypted = ignore,
-    Object? passwordKeyName = ignore,
+    Object? csv = ignore,
+    Object? enc = ignore,
+    Object? secretId = ignore,
   }) {
     return collection.updateProperties(id, {
       if (name != ignore) 1: name as String?,
-      if (csvContent != ignore) 2: csvContent as String?,
-      if (isEncrypted != ignore) 3: isEncrypted as bool?,
-      if (passwordKeyName != ignore) 4: passwordKeyName as String?,
+      if (csv != ignore) 2: csv as String?,
+      if (enc != ignore) 3: enc as bool?,
+      if (secretId != ignore) 4: secretId as String?,
     });
   }
 }
@@ -224,9 +216,9 @@ extension SheetUpdate on IsarCollection<int, Sheet> {
 sealed class _SheetQueryUpdate {
   int call({
     String? name,
-    String? csvContent,
-    bool? isEncrypted,
-    String? passwordKeyName,
+    String? csv,
+    bool? enc,
+    String? secretId,
   });
 }
 
@@ -239,15 +231,15 @@ class _SheetQueryUpdateImpl implements _SheetQueryUpdate {
   @override
   int call({
     Object? name = ignore,
-    Object? csvContent = ignore,
-    Object? isEncrypted = ignore,
-    Object? passwordKeyName = ignore,
+    Object? csv = ignore,
+    Object? enc = ignore,
+    Object? secretId = ignore,
   }) {
     return query.updateProperties(limit: limit, {
       if (name != ignore) 1: name as String?,
-      if (csvContent != ignore) 2: csvContent as String?,
-      if (isEncrypted != ignore) 3: isEncrypted as bool?,
-      if (passwordKeyName != ignore) 4: passwordKeyName as String?,
+      if (csv != ignore) 2: csv as String?,
+      if (enc != ignore) 3: enc as bool?,
+      if (secretId != ignore) 4: secretId as String?,
     });
   }
 }
@@ -267,17 +259,17 @@ class _SheetQueryBuilderUpdateImpl implements _SheetQueryUpdate {
   @override
   int call({
     Object? name = ignore,
-    Object? csvContent = ignore,
-    Object? isEncrypted = ignore,
-    Object? passwordKeyName = ignore,
+    Object? csv = ignore,
+    Object? enc = ignore,
+    Object? secretId = ignore,
   }) {
     final q = query.build();
     try {
       return q.updateProperties(limit: limit, {
         if (name != ignore) 1: name as String?,
-        if (csvContent != ignore) 2: csvContent as String?,
-        if (isEncrypted != ignore) 3: isEncrypted as bool?,
-        if (passwordKeyName != ignore) 4: passwordKeyName as String?,
+        if (csv != ignore) 2: csv as String?,
+        if (enc != ignore) 3: enc as bool?,
+        if (secretId != ignore) 4: secretId as String?,
       });
     } finally {
       q.close();
@@ -543,7 +535,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentEqualTo(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvEqualTo(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -558,7 +550,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentGreaterThan(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvGreaterThan(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -573,8 +565,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition>
-      csvContentGreaterThanOrEqualTo(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvGreaterThanOrEqualTo(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -589,7 +580,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentLessThan(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvLessThan(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -604,7 +595,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentLessThanOrEqualTo(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvLessThanOrEqualTo(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -619,7 +610,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentBetween(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvBetween(
     String lower,
     String upper, {
     bool caseSensitive = true,
@@ -636,7 +627,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentStartsWith(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -651,7 +642,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentEndsWith(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -666,8 +657,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentContains(
-      String value,
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContains(String value,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -680,8 +670,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentMatches(
-      String pattern,
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvMatches(String pattern,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -694,7 +683,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentIsEmpty() {
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         const EqualCondition(
@@ -705,7 +694,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvContentIsNotEmpty() {
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> csvIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         const GreaterCondition(
@@ -716,7 +705,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> isEncryptedEqualTo(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> encEqualTo(
     bool value,
   ) {
     return QueryBuilder.apply(this, (query) {
@@ -729,19 +718,19 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameIsNull() {
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const IsNullCondition(property: 4));
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameIsNotNull() {
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdIsNotNull() {
     return QueryBuilder.apply(not(), (query) {
       return query.addFilterCondition(const IsNullCondition(property: 4));
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameEqualTo(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdEqualTo(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -756,7 +745,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameGreaterThan(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdGreaterThan(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -772,7 +761,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
   }
 
   QueryBuilder<Sheet, Sheet, QAfterFilterCondition>
-      passwordKeyNameGreaterThanOrEqualTo(
+      secretIdGreaterThanOrEqualTo(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -787,7 +776,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameLessThan(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdLessThan(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -802,8 +791,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition>
-      passwordKeyNameLessThanOrEqualTo(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdLessThanOrEqualTo(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -818,7 +806,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameBetween(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdBetween(
     String? lower,
     String? upper, {
     bool caseSensitive = true,
@@ -835,7 +823,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameStartsWith(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -850,7 +838,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameEndsWith(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -865,7 +853,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameContains(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdContains(
       String value,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -879,7 +867,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameMatches(
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdMatches(
       String pattern,
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -893,7 +881,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> passwordKeyNameIsEmpty() {
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         const EqualCondition(
@@ -904,8 +892,7 @@ extension SheetQueryFilter on QueryBuilder<Sheet, Sheet, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterFilterCondition>
-      passwordKeyNameIsNotEmpty() {
+  QueryBuilder<Sheet, Sheet, QAfterFilterCondition> secretIdIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         const GreaterCondition(
@@ -1139,7 +1126,7 @@ extension SheetQuerySortBy on QueryBuilder<Sheet, Sheet, QSortBy> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByCsvContent(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByCsv(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(
@@ -1149,7 +1136,7 @@ extension SheetQuerySortBy on QueryBuilder<Sheet, Sheet, QSortBy> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByCsvContentDesc(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByCsvDesc(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(
@@ -1160,19 +1147,19 @@ extension SheetQuerySortBy on QueryBuilder<Sheet, Sheet, QSortBy> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByIsEncrypted() {
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByEnc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(3);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByIsEncryptedDesc() {
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByEncDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(3, sort: Sort.desc);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByPasswordKeyName(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortBySecretId(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(
@@ -1182,7 +1169,7 @@ extension SheetQuerySortBy on QueryBuilder<Sheet, Sheet, QSortBy> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortByPasswordKeyNameDesc(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> sortBySecretIdDesc(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(
@@ -1221,40 +1208,40 @@ extension SheetQuerySortThenBy on QueryBuilder<Sheet, Sheet, QSortThenBy> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByCsvContent(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByCsv(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(2, caseSensitive: caseSensitive);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByCsvContentDesc(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByCsvDesc(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(2, sort: Sort.desc, caseSensitive: caseSensitive);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByIsEncrypted() {
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByEnc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(3);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByIsEncryptedDesc() {
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByEncDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(3, sort: Sort.desc);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByPasswordKeyName(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenBySecretId(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(4, caseSensitive: caseSensitive);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenByPasswordKeyNameDesc(
+  QueryBuilder<Sheet, Sheet, QAfterSortBy> thenBySecretIdDesc(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(4, sort: Sort.desc, caseSensitive: caseSensitive);
@@ -1270,20 +1257,20 @@ extension SheetQueryWhereDistinct on QueryBuilder<Sheet, Sheet, QDistinct> {
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterDistinct> distinctByCsvContent(
+  QueryBuilder<Sheet, Sheet, QAfterDistinct> distinctByCsv(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(2, caseSensitive: caseSensitive);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterDistinct> distinctByIsEncrypted() {
+  QueryBuilder<Sheet, Sheet, QAfterDistinct> distinctByEnc() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(3);
     });
   }
 
-  QueryBuilder<Sheet, Sheet, QAfterDistinct> distinctByPasswordKeyName(
+  QueryBuilder<Sheet, Sheet, QAfterDistinct> distinctBySecretId(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(4, caseSensitive: caseSensitive);
@@ -1310,19 +1297,19 @@ extension SheetQueryProperty1 on QueryBuilder<Sheet, Sheet, QProperty> {
     });
   }
 
-  QueryBuilder<Sheet, String, QAfterProperty> csvContentProperty() {
+  QueryBuilder<Sheet, String, QAfterProperty> csvProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(2);
     });
   }
 
-  QueryBuilder<Sheet, bool, QAfterProperty> isEncryptedProperty() {
+  QueryBuilder<Sheet, bool, QAfterProperty> encProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(3);
     });
   }
 
-  QueryBuilder<Sheet, String?, QAfterProperty> passwordKeyNameProperty() {
+  QueryBuilder<Sheet, String?, QAfterProperty> secretIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(4);
     });
@@ -1348,19 +1335,19 @@ extension SheetQueryProperty2<R> on QueryBuilder<Sheet, R, QAfterProperty> {
     });
   }
 
-  QueryBuilder<Sheet, (R, String), QAfterProperty> csvContentProperty() {
+  QueryBuilder<Sheet, (R, String), QAfterProperty> csvProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(2);
     });
   }
 
-  QueryBuilder<Sheet, (R, bool), QAfterProperty> isEncryptedProperty() {
+  QueryBuilder<Sheet, (R, bool), QAfterProperty> encProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(3);
     });
   }
 
-  QueryBuilder<Sheet, (R, String?), QAfterProperty> passwordKeyNameProperty() {
+  QueryBuilder<Sheet, (R, String?), QAfterProperty> secretIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(4);
     });
@@ -1387,20 +1374,19 @@ extension SheetQueryProperty3<R1, R2>
     });
   }
 
-  QueryBuilder<Sheet, (R1, R2, String), QOperations> csvContentProperty() {
+  QueryBuilder<Sheet, (R1, R2, String), QOperations> csvProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(2);
     });
   }
 
-  QueryBuilder<Sheet, (R1, R2, bool), QOperations> isEncryptedProperty() {
+  QueryBuilder<Sheet, (R1, R2, bool), QOperations> encProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(3);
     });
   }
 
-  QueryBuilder<Sheet, (R1, R2, String?), QOperations>
-      passwordKeyNameProperty() {
+  QueryBuilder<Sheet, (R1, R2, String?), QOperations> secretIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addProperty(4);
     });
